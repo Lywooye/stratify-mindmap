@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2
+
+- Fixed newly created child nodes being immediately replaced on screen by a stale Markdown editor buffer.
+- Kept source-mode edits responsive by reading the live editor only while the Markdown source is visible.
+
 ## 1.1.1
 
 - Fixed Tab-created child nodes and edited root labels being lost when the active structure diverged from note frontmatter.

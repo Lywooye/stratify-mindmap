@@ -398,10 +398,15 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
       if (isMindmap) {
         let content;
-        try {
-          content = view.editor ? view.editor.getValue() : await this.app.vault.cachedRead(file);
-        } catch (e) {
-          content = await this.app.vault.cachedRead(file);
+        const sourceVisible = existing && existing.classList.contains('stratify-hidden');
+        if (existing && !sourceVisible) {
+          content = await this._readFileContent(file);
+        } else {
+          try {
+            content = view.editor ? view.editor.getValue() : await this._readFileContent(file);
+          } catch (e) {
+            content = await this._readFileContent(file);
+          }
         }
         let overlay = existing;
         if (!overlay) {

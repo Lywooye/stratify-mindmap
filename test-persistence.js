@@ -18,11 +18,14 @@ function stringifyYaml(value) {
   return Object.entries(value || {}).map(([key, item]) => key + ': ' + item).join('\n') + '\n';
 }
 
+class MockMarkdownView {}
+
 Module._load = function (request, parent, isMain) {
   if (request !== 'obsidian') return originalLoad.call(this, request, parent, isMain);
   return {
     Plugin: class {},
     PluginSettingTab: class {},
+    MarkdownView: MockMarkdownView,
     parseYaml,
     stringifyYaml,
   };
@@ -30,7 +33,7 @@ Module._load = function (request, parent, isMain) {
 
 global.requestAnimationFrame = (callback) => callback();
 
-const Plugin = require('./main.js');
+const Plugin = require(process.env.STRATIFY_MAIN || './main.js');
 const plugin = Object.create(Plugin.prototype);
 plugin.settings = {
   defaultStructure: 'list',
@@ -47,17 +50,30 @@ let editorValue = plugin._newMindmapContent();
 let diskValue = editorValue;
 let writeCount = 0;
 let editorSetCount = 0;
+let editorReadCount = 0;
+let vaultReadCount = 0;
 const editor = {
-  getValue: () => editorValue,
+  getValue: () => {
+    editorReadCount += 1;
+    return editorValue;
+  },
   setValue: (value) => {
     editorValue = value;
     editorSetCount += 1;
   },
 };
-const view = { file, editor };
+const view = Object.assign(new MockMarkdownView(), { file, editor });
 plugin.app = {
   workspace: { getLeavesOfType: () => [{ view }] },
+  metadataCache: {
+    getFileCache: () => ({ frontmatter: { type: 'mindmap', 'mindmap-structure': 'list' } }),
+  },
   vault: {
+    cachedRead: async (target) => {
+      assert.strictEqual(target, file);
+      vaultReadCount += 1;
+      return diskValue;
+    },
     modify: async (target, value) => {
       assert.strictEqual(target, file);
       diskValue = value;
@@ -78,6 +94,12 @@ async function run() {
     _stratifySelected: null,
     _stratifyPendingEdit: null,
   };
+  let sourceVisible = false;
+  overlay.classList = {
+    contains: (name) => name === 'stratify-hidden' && sourceVisible,
+  };
+  overlay.dataset = {};
+  view.contentEl = { querySelector: () => overlay };
 
   const undoSnapshot = plugin._currentMindmapContent(overlay);
   plugin._updateNodeText(treeInfo.tree, 'Renamed Root');
@@ -92,6 +114,22 @@ async function run() {
 
   assert.strictEqual(writeCount, 1);
   assert.strictEqual(editorSetCount, 0, 'saving should keep Light Mindmap\'s single vault write behavior');
+
+  const renderedContents = [];
+  plugin._render = (targetOverlay, content) => renderedContents.push(content);
+  editorReadCount = 0;
+  vaultReadCount = 0;
+  await plugin._doScan();
+  assert.strictEqual(vaultReadCount, 1, 'a visible mindmap must scan the saved vault content');
+  assert.strictEqual(editorReadCount, 0, 'a visible mindmap must not scan a stale editor buffer');
+  assert.deepStrictEqual(renderedContents, [], 'a stale editor buffer must not replace the newly rendered child');
+
+  sourceVisible = true;
+  editorValue = diskValue.replace('Renamed Root', 'Source Root');
+  await plugin._doScan();
+  assert.strictEqual(editorReadCount, 1, 'source mode must scan the live editor buffer');
+  assert.strictEqual(overlay._stratifyStaleContent, editorValue);
+  sourceVisible = false;
 
   const reopenedFrontmatter = plugin._splitFrontmatter(diskValue).frontmatter;
   const reopenedMode = plugin._readStructureFromFrontmatter(reopenedFrontmatter);
@@ -122,7 +160,7 @@ async function run() {
   assert.strictEqual(plugin._resolveStructure(brokenFrontmatter, broken), 'heading');
   assert.strictEqual(plugin._parseStructured(broken, plugin._resolveStructure(brokenFrontmatter, broken)).headings.length, 2);
 
-  console.log('Tab persistence, reopen, atomic mode, and mismatch recovery tests passed');
+  console.log('Tab display, persistence, reopen, atomic mode, and mismatch recovery tests passed');
 }
 
 run().catch((error) => {
