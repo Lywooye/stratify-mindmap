@@ -134,7 +134,9 @@ Existing notes remain compatible because Stratify keeps `type: mindmap` and the 
 
 ## Privacy and Network Use
 
-Stratify Mindmap works locally and offline. It does not make network requests, collect telemetry, display ads, access files outside the current vault, or implement its own update mechanism. It reads and writes only mind map notes, PNG exports requested by the user, and its local plugin settings.
+Stratify Mindmap works locally and offline. It does not make network requests, collect telemetry, display ads, access files outside the current vault, or implement its own update mechanism. It reads or writes file contents only for mind map notes, PNG exports requested by the user, and its local plugin settings.
+
+When you type `[[` while editing a node, the wiki-link autocomplete uses Obsidian's `vault.getMarkdownFiles()` API to list Markdown file paths and metadata in the current vault. It does not read the contents of those notes. The list is cached in memory for up to five seconds and is never transmitted or stored by the plugin.
 
 ## Development
 

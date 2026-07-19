@@ -134,7 +134,9 @@ Stratify 保留了 `type: mindmap` 和现有 `mindmap-*` frontmatter，因此旧
 
 ## 隐私与网络
 
-Stratify Mindmap 完全在本地离线运行。它不会发起网络请求、收集遥测、展示广告、访问当前 Vault 以外的文件，也不包含自行更新机制。插件只会读写思维导图笔记、用户主动导出的 PNG 文件和本地插件设置。
+Stratify Mindmap 完全在本地离线运行。它不会发起网络请求、收集遥测、展示广告、访问当前 Vault 以外的文件，也不包含自行更新机制。插件只会读取或写入思维导图笔记、用户主动导出的 PNG 文件和本地插件设置的内容。
+
+在节点编辑状态输入 `[[` 时，Wiki 链接自动补全会通过 Obsidian 的 `vault.getMarkdownFiles()` API 列出当前 Vault 中 Markdown 文件的路径和元数据，但不会读取这些笔记的正文。该列表只在内存中缓存最多 5 秒，插件不会保存或传输它。
 
 ## 开发
 
