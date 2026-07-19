@@ -11,7 +11,7 @@
     "moduleResolution": "node",
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "strict": false,
+    "strict": true,
     "target": "ES2021"
   },
   "include": [

@@ -35,13 +35,6 @@ export default defineConfig(
   {
     files: ['src/**/*.ts'],
     rules: {
-      // The renderer uses an extensible in-memory tree while its public API remains typed.
-      '@typescript-eslint/no-unsafe-argument': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
       'obsidianmd/ui/sentence-case': ['warn', {
         brands: ['Stratify Mindmap', 'Markdown', 'PNG'],
         acronyms: ['PNG'],

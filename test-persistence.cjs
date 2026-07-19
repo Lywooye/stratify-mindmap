@@ -120,10 +120,11 @@ async function run() {
   overlay.ownerDocument = {
     defaultView: { requestAnimationFrame: (callback) => callback() },
   };
+  const hostClasses = new Set();
   view.contentEl = {
     querySelector: () => overlay,
-    addClass: () => {},
-    removeClass: () => {},
+    addClass: (name) => hostClasses.add(name),
+    removeClass: (name) => hostClasses.delete(name),
   };
 
   const undoSnapshot = plugin._currentMindmapContent(overlay);
@@ -150,6 +151,7 @@ async function run() {
   assert.strictEqual(editorReadCount, 1, 'an open mindmap must scan the live editor buffer');
   assert.strictEqual(vaultReadCount, 0, 'an open mindmap must not scan stale disk content');
   assert.deepStrictEqual(renderedContents, [], 'stale disk content must not replace the newly rendered child');
+  assert.ok(hostClasses.has('stratify-map-visible'), 'visible maps must hide the underlying Markdown pane');
 
   const persistedEditorValue = editorValue;
   sourceVisible = true;
@@ -157,6 +159,7 @@ async function run() {
   await plugin._doScan();
   assert.strictEqual(editorReadCount, 2, 'source mode must scan the live editor buffer');
   assert.strictEqual(overlay._stratifyStaleContent, editorValue);
+  assert.ok(!hostClasses.has('stratify-map-visible'), 'source mode must reveal the underlying Markdown pane');
   sourceVisible = false;
 
   editorValue = persistedEditorValue;

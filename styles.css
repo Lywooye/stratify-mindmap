@@ -4,8 +4,8 @@
 
 /* Hide the underlying source/reading panes when overlay is visible so
    theme-provided translucency can never leak source text through. */
-.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host:has(> .stratify-overlay:not(.stratify-hidden)) > .markdown-source-view,
-.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host:has(> .stratify-overlay:not(.stratify-hidden)) > .markdown-reading-view {
+.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host.stratify-map-visible > .markdown-source-view,
+.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host.stratify-map-visible > .markdown-reading-view {
   visibility: hidden;
 }
 
@@ -525,7 +525,6 @@
   z-index: 8;
   min-width: 80px;
   caret-color: currentColor;
-  transform: none !important;
 }
 
 .stratify-node.stratify-editing.stratify-node-root {
@@ -642,9 +641,9 @@
 }
 
 /* Virtual root (used when multiple top-level headings) */
-.stratify-node-virtual {
-  background: #475569 !important;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.20) !important;
+.stratify-overlay .stratify-node.stratify-node-root.stratify-node-virtual {
+  background: #475569;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.20);
 }
 
 /* ---------- Node shape variants (mindmap-node) ---------- */
@@ -750,6 +749,10 @@
   font-size: calc(var(--stratify-font-size, 13px) - 0.5px);
 }
 
+.stratify-overlay.stratify-node-style-doodle .stratify-node.stratify-editing {
+  transform: none;
+}
+
 .stratify-node.stratify-node-source-note {
   padding-right: 17px;
 }
@@ -822,7 +825,7 @@
 
 .stratify-link {
   color: inherit;
-  text-decoration: underline;
+  text-decoration-line: underline;
   text-decoration-style: dotted;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -835,7 +838,7 @@
 }
 
 .stratify-node.stratify-editing .stratify-link {
-  text-decoration: none;
+  text-decoration-line: none;
   pointer-events: none;
 }
 
