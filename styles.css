@@ -1,11 +1,11 @@
-.workspace-leaf-content[data-type="markdown"] .view-content {
+.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host {
   position: relative;
 }
 
 /* Hide the underlying source/reading panes when overlay is visible so
    theme-provided translucency can never leak source text through. */
-.workspace-leaf-content[data-type="markdown"] .view-content:has(> .stratify-overlay:not(.stratify-hidden)) > .markdown-source-view,
-.workspace-leaf-content[data-type="markdown"] .view-content:has(> .stratify-overlay:not(.stratify-hidden)) > .markdown-reading-view {
+.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host:has(> .stratify-overlay:not(.stratify-hidden)) > .markdown-source-view,
+.workspace-leaf-content[data-type="markdown"] .view-content.stratify-host:has(> .stratify-overlay:not(.stratify-hidden)) > .markdown-reading-view {
   visibility: hidden;
 }
 
@@ -16,18 +16,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: #ffffff;
   background-color: var(--stratify-theme-bg, var(--background-primary));
   font-family: var(--font-interface);
   color: var(--stratify-theme-fg, var(--text-normal));
   --stratify-font-size: 13px;
   --stratify-node-max-width: 260px;
   isolation: isolate;
-}
-
-.theme-dark .stratify-overlay {
-  background-color: #1e1e1e;
-  background-color: var(--stratify-theme-bg, var(--background-primary));
 }
 
 .stratify-overlay.stratify-hidden {
@@ -92,13 +86,13 @@
 
 .stratify-btn-active {
   background: var(--interactive-accent);
-  color: #fff;
+  color: var(--text-on-accent);
   border-color: transparent;
 }
 
 .stratify-btn-active:hover {
   background: var(--interactive-accent-hover);
-  color: #fff;
+  color: var(--text-on-accent);
 }
 
 .stratify-btn-ghost {
@@ -237,6 +231,7 @@
 
 .stratify-theme-swatch {
   min-width: 0;
+  background: var(--stratify-swatch-color);
 }
 
 .stratify-setting-theme-preview {
@@ -327,6 +322,8 @@
 
 .stratify-node {
   position: absolute;
+  left: var(--stratify-node-x, 0);
+  top: var(--stratify-node-y, 0);
   width: max-content;
   min-width: 40px;
   max-width: var(--stratify-node-max-width, 260px);
@@ -396,6 +393,11 @@
   opacity: 0.88;
   cursor: grabbing;
   transform: translate3d(0, 0, 0);
+  right: auto;
+  bottom: auto;
+  margin: 0;
+  box-sizing: border-box;
+  transform-origin: top left;
   transition: none;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.20);
 }
@@ -533,6 +535,8 @@
 /* Mention autocomplete popup */
 .stratify-mention-popup {
   position: fixed;
+  left: var(--stratify-popup-left, 0);
+  top: var(--stratify-popup-top, 0);
   z-index: 100;
   min-width: 180px;
   max-width: 320px;
@@ -559,7 +563,12 @@
 }
 .stratify-mention-item.stratify-mention-active {
   background: var(--interactive-accent, #6366F1);
-  color: #fff;
+  color: var(--text-on-accent);
+}
+
+.stratify-doodle-filter-host {
+  position: absolute;
+  pointer-events: none;
 }
 
 /* Root */

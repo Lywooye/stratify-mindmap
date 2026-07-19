@@ -97,24 +97,24 @@ Dragging onto the upper or lower part of a node inserts before or after it. Drop
 
 ## Toolbar and Settings
 
-The main toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. The appearance menu shows every theme as a named row of color swatches, followed by connector style, node shape, and PNG export.
+The main toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. The appearance menu shows every theme as a named row of color swatches, followed by connector style, node shape, and PNG export. Exported images are saved beside the source note as `<note-name>.mindmap.png`, on both desktop and mobile.
 
 The Obsidian settings page controls defaults for new or unconfigured maps, the global node font size, keyboard navigation, and leaf-node drop behavior. Existing frontmatter is not overwritten by changing defaults.
 
 ## Create or Convert a Mind Map
 
-- Use the ribbon command or command palette action **Convert current note to Stratify mindmap**.
-- Right-click a Markdown file and choose **Convert to Stratify mindmap**.
-- Right-click a folder and choose **Create Stratify mindmap**.
+- Use the ribbon command or command palette action **Convert current note to mind map**.
+- Right-click a Markdown file and choose **Convert to Stratify mind map**.
+- Right-click a folder and choose **Create Stratify mind map**.
 
 Conversion adds the required frontmatter and detects the source structure without rewriting the note body.
 
 ## Installation
 
-Stratify Mindmap is currently installed manually and is not yet listed in Obsidian Community Plugins.
+Until Stratify Mindmap is listed in Obsidian Community Plugins, install it from a GitHub release:
 
 1. Create `<vault>/.obsidian/plugins/stratify-mindmap/`.
-2. Place `main.js`, `manifest.json`, and `styles.css` in that directory.
+2. Download the release assets `main.js`, `manifest.json`, and `styles.css` and place them in that directory.
 3. Reload Obsidian.
 4. Enable **Stratify Mindmap** under **Settings -> Community plugins**.
 
@@ -126,9 +126,24 @@ Existing notes remain compatible because Stratify keeps `type: mindmap` and the 
 
 ## Compatibility
 
-- Obsidian 1.4.0 or later
+- Obsidian 1.8.7 or later
 - macOS, Windows, Linux, iOS, and Android
 - Obsidian Sync-compatible because map content remains Markdown
+
+## Privacy and Network Use
+
+Stratify Mindmap works locally and offline. It does not make network requests, collect telemetry, display ads, access files outside the current vault, or implement its own update mechanism. It reads and writes only mind map notes, PNG exports requested by the user, and its local plugin settings.
+
+## Development
+
+The repository contains TypeScript source in `src/`; the generated `main.js` is attached only to GitHub releases.
+
+```bash
+npm install
+npm run check
+```
+
+`npm run check` runs the official Obsidian ESLint rules, the persistence regression test, TypeScript validation, and the production build.
 
 ## Credits and License
 

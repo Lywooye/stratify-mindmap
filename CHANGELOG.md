@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.3
+
+- Added reproducible TypeScript, npm, ESLint, CI, and GitHub Release tooling for Obsidian Community submission.
+- Replaced direct active-note and Adapter API writes with the Editor, Vault, FileManager, and normalized-path APIs.
+- Removed Electron and Node.js dependencies so PNG export behaves consistently on desktop and mobile.
+- Replaced unsafe SVG `innerHTML`, global document assumptions, manual settings headings, and plugin-prefixed command IDs.
+- Added explicit offline and privacy disclosures and stopped tracking generated `main.js` in the repository.
+
 ## 1.1.2
 
 - Fixed newly created child nodes being immediately replaced on screen by a stale Markdown editor buffer.

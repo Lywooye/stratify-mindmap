@@ -1,6 +1,6 @@
-'use strict';
+import * as obsidian from 'obsidian';
 
-const obsidian = require('obsidian');
+type StratifyElement = HTMLElement & Record<string, any>;
 
 // Categorical branch palettes adapted from Paul Tol, Tableau, and ColorBrewer.
 const THEMES = {
@@ -122,6 +122,11 @@ const PAD = 40;
 const PLACEHOLDER = 'New Title';
 
 class StratifyMindmapPlugin extends obsidian.Plugin {
+  pluginSettings = { ...DEFAULT_PLUGIN_SETTINGS };
+  _scan!: () => void;
+  _fileCache: obsidian.TFile[] | null = null;
+  _fileCacheTime = 0;
+
   async onload() {
     await this.loadSettings();
     this._scan = obsidian.debounce(() => this._doScan(), 120);
@@ -136,23 +141,23 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     this.registerEvent(this.app.workspace.on('editor-change', () => this._scan()));
     this.registerEvent(this.app.metadataCache.on('changed', () => this._scan()));
 
-    this.addRibbonIcon('network', 'Convert current note to Stratify mindmap', () => {
+    this.addRibbonIcon('network', 'Convert current note to mind map', () => {
       void this._convertActiveFileToMindmap();
     });
 
     this.addCommand({
-      id: 'stratify-convert-current-note',
-      name: 'Convert current note to Stratify mindmap',
+      id: 'convert-current-note',
+      name: 'Convert current note to mind map',
       callback: () => void this._convertActiveFileToMindmap()
     });
 
     this.addCommand({
-      id: 'stratify-toggle-source',
-      name: 'Toggle mindmap / source view',
+      id: 'toggle-source',
+      name: 'Toggle mind map and source view',
       callback: () => {
         const v = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
         if (!v) return;
-        const o = v.contentEl.querySelector(':scope > .stratify-overlay');
+        const o = v.contentEl.querySelector<StratifyElement>(':scope > .stratify-overlay');
         if (!o) return;
         if (o.classList.contains('stratify-hidden')) {
           o.classList.remove('stratify-hidden');
@@ -165,28 +170,28 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     });
 
     this.addCommand({
-      id: 'stratify-cycle-layout',
-      name: 'Cycle mindmap layout (balanced / right / left / tree / radial)',
+      id: 'cycle-layout',
+      name: 'Cycle mind map layout',
       callback: () => {
         const v = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
         if (!v) return;
-        const o = v.contentEl.querySelector(':scope > .stratify-overlay');
+        const o = v.contentEl.querySelector<StratifyElement>(':scope > .stratify-overlay');
         if (!o) return;
         const layouts = ['balanced', 'right', 'left', 'tree', 'radial'];
         const cur = o._stratifyLayout || 'balanced';
         const next = layouts[(layouts.indexOf(cur) + 1) % layouts.length];
         o._stratifyLayout = next;
         if (o._stratifyTreeInfo) this._renderTreeIntoCanvas(o, false);
-        this._persistFrontmatterValue(o._stratifyFile, 'mindmap-layout', next);
+        void this._persistFrontmatterValue(o._stratifyFile, 'mindmap-layout', next);
       }
     });
 
     // Right-click menu: create new mindmap file in folder
     this.registerEvent(this.app.workspace.on('file-menu', (menu, file) => {
-      const lang = window.localStorage.getItem('language') || 'en';
+      const zh = this._isZh();
       if (file instanceof obsidian.TFolder) {
         menu.addItem((item) => {
-          const title = lang.startsWith('zh') ? '新建 Stratify 导图' : 'Create Stratify mindmap';
+          const title = zh ? '新建 Stratify 导图' : 'Create Stratify mind map';
           item
             .setTitle(title)
             .setIcon('network')
@@ -204,7 +209,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         });
       } else if (file instanceof obsidian.TFile && file.extension === 'md') {
         menu.addItem((item) => {
-          const title = lang.startsWith('zh') ? '转换为 Stratify 导图' : 'Convert to Stratify mindmap';
+          const title = zh ? '转换为 Stratify 导图' : 'Convert to Stratify mind map';
           item
             .setTitle(title)
             .setIcon('network')
@@ -221,32 +226,32 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
   async loadSettings() {
     const data = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_PLUGIN_SETTINGS, data || {});
+    this.pluginSettings = Object.assign({}, DEFAULT_PLUGIN_SETTINGS, data || {});
     this._sanitizeSettings();
   }
 
   _sanitizeSettings() {
-    this.settings.defaultStructure = this._normalizeStructureMode(this.settings.defaultStructure) || DEFAULT_STRUCTURE;
-    this.settings.defaultLayout = this._normalizeLayout(this.settings.defaultLayout) || DEFAULT_LAYOUT;
-    this.settings.defaultTheme = THEMES[this.settings.defaultTheme] ? this.settings.defaultTheme : DEFAULT_THEME;
-    this.settings.defaultLine = LINE_STYLES[this.settings.defaultLine] ? this.settings.defaultLine : DEFAULT_LINE;
-    this.settings.defaultNodeStyle = NODE_STYLES[this.settings.defaultNodeStyle] ? this.settings.defaultNodeStyle : DEFAULT_NODE_STYLE;
-    const fontSize = Number(this.settings.nodeFontSize);
-    this.settings.nodeFontSize = Number.isFinite(fontSize)
+    this.pluginSettings.defaultStructure = this._normalizeStructureMode(this.pluginSettings.defaultStructure) || DEFAULT_STRUCTURE;
+    this.pluginSettings.defaultLayout = this._normalizeLayout(this.pluginSettings.defaultLayout) || DEFAULT_LAYOUT;
+    this.pluginSettings.defaultTheme = THEMES[this.pluginSettings.defaultTheme] ? this.pluginSettings.defaultTheme : DEFAULT_THEME;
+    this.pluginSettings.defaultLine = LINE_STYLES[this.pluginSettings.defaultLine] ? this.pluginSettings.defaultLine : DEFAULT_LINE;
+    this.pluginSettings.defaultNodeStyle = NODE_STYLES[this.pluginSettings.defaultNodeStyle] ? this.pluginSettings.defaultNodeStyle : DEFAULT_NODE_STYLE;
+    const fontSize = Number(this.pluginSettings.nodeFontSize);
+    this.pluginSettings.nodeFontSize = Number.isFinite(fontSize)
       ? Math.min(MAX_NODE_FONT_SIZE, Math.max(MIN_NODE_FONT_SIZE, Math.round(fontSize)))
       : DEFAULT_PLUGIN_SETTINGS.nodeFontSize;
-    this.settings.keyboardNavigation = this.settings.keyboardNavigation !== false;
-    this.settings.leafOutsideDropCreatesChild = this.settings.leafOutsideDropCreatesChild !== false;
+    this.pluginSettings.keyboardNavigation = this.pluginSettings.keyboardNavigation !== false;
+    this.pluginSettings.leafOutsideDropCreatesChild = this.pluginSettings.leafOutsideDropCreatesChild !== false;
   }
 
   async saveSettings() {
     this._sanitizeSettings();
-    await this.saveData(this.settings);
+    await this.saveData(this.pluginSettings);
   }
 
   _getSetting(key) {
-    if (this.settings && Object.prototype.hasOwnProperty.call(this.settings, key)) {
-      return this.settings[key];
+    if (this.pluginSettings && Object.prototype.hasOwnProperty.call(this.pluginSettings, key)) {
+      return this.pluginSettings[key];
     }
     return DEFAULT_PLUGIN_SETTINGS[key];
   }
@@ -301,12 +306,16 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _refreshDisplaySettings() {
-    document.querySelectorAll('.stratify-overlay').forEach((overlay) => {
+    for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+      const view = leaf.view;
+      if (!(view instanceof obsidian.MarkdownView)) continue;
+      const overlay = view.contentEl.querySelector<StratifyElement>(':scope > .stratify-overlay');
+      if (!overlay) continue;
       this._applyDisplaySettingsToOverlay(overlay);
       if (overlay._stratifyTreeInfo && overlay._stratifyCanvas) {
         this._renderTreeIntoCanvas(overlay, true);
       }
-    });
+    }
   }
 
   _newMindmapContent() {
@@ -336,14 +345,18 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   async _readFileContent(file) {
-    if (this.app.vault.cachedRead) return this.app.vault.cachedRead(file);
-    return this.app.vault.read(file);
+    return this.app.vault.cachedRead(file);
   }
 
   async _writeMindmapContent(overlay, content) {
     const file = overlay && overlay._stratifyFile;
     if (!file) return;
-    await this.app.vault.modify(file, content);
+    const view = overlay._stratifyView;
+    if (view instanceof obsidian.MarkdownView && view.file === file && view.editor) {
+      view.editor.setValue(content);
+    } else {
+      await this.app.vault.process(file, () => content);
+    }
     overlay._stratifyLastContent = content;
   }
 
@@ -375,13 +388,23 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   onunload() {
-    document.querySelectorAll('.stratify-overlay').forEach((el) => {
-      if (el._stratifyCleanup) el._stratifyCleanup();
-      el.remove();
-    });
-    document.querySelectorAll('.stratify-fab').forEach((el) => el.remove());
-    const doodleSvg = document.getElementById('stratify-doodle-filter');
-    if (doodleSvg) doodleSvg.closest('svg').remove();
+    const documents = new Set<Document>([activeDocument]);
+    for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+      const view = leaf.view;
+      if (!(view instanceof obsidian.MarkdownView)) continue;
+      documents.add(view.contentEl.ownerDocument);
+      const overlay = view.contentEl.querySelector<StratifyElement>(':scope > .stratify-overlay');
+      if (overlay && overlay._stratifyPointerDrag) {
+        this._finishNodePointerDrag(overlay._stratifyPointerDrag, false);
+      }
+      if (overlay && overlay._stratifyCleanup) overlay._stratifyCleanup();
+      if (overlay) overlay.remove();
+      view.contentEl.querySelectorAll('.stratify-fab').forEach((el) => el.remove());
+      view.contentEl.removeClass('stratify-host');
+    }
+    for (const ownerDocument of documents) {
+      ownerDocument.getElementById('stratify-doodle-filter')?.remove();
+    }
   }
 
   async _doScan() {
@@ -394,9 +417,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       const cache = this.app.metadataCache.getFileCache(file);
       const fm = cache && cache.frontmatter;
       const isMindmap = fm && String(fm.type).toLowerCase() === 'mindmap';
-      const existing = view.contentEl.querySelector(':scope > .stratify-overlay');
+      const existing = view.contentEl.querySelector<StratifyElement>(':scope > .stratify-overlay');
 
       if (isMindmap) {
+        view.contentEl.addClass('stratify-host');
         let content;
         const sourceVisible = existing && existing.classList.contains('stratify-hidden');
         if (existing && !sourceVisible) {
@@ -404,7 +428,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         } else {
           try {
             content = view.editor ? view.editor.getValue() : await this._readFileContent(file);
-          } catch (e) {
+          } catch {
             content = await this._readFileContent(file);
           }
         }
@@ -446,6 +470,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       } else if (existing) {
         existing.remove();
         this._removeRestoreFab(view);
+        view.contentEl.removeClass('stratify-host');
+      } else {
+        view.contentEl.removeClass('stratify-host');
       }
     }
   }
@@ -459,7 +486,11 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
     if (!m) return { frontmatterRaw: '', frontmatter: null, body: content };
     let parsed = null;
-    try { parsed = obsidian.parseYaml(m[1]) || {}; } catch (e) {}
+    try {
+      parsed = obsidian.parseYaml(m[1]) || {};
+    } catch {
+      parsed = null;
+    }
     return { frontmatterRaw: m[0], frontmatter: parsed, body: content.slice(m[0].length) };
   }
 
@@ -512,11 +543,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     let last = 0;
     for (const link of links) {
       if (link.start < last) continue; // skip overlapping
-      if (link.start > last) el.appendChild(document.createTextNode(raw.slice(last, link.start)));
+      if (link.start > last) el.appendText(raw.slice(last, link.start));
 
-      const a = document.createElement('a');
-      a.className = 'stratify-link';
-      a.textContent = link.text;
+      const a = el.createEl('a', { cls: 'stratify-link', text: link.text });
 
       if (link.type === 'md') {
         const href = link.target;
@@ -530,7 +559,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
             e.preventDefault();
             e.stopPropagation();
             const fp = obsidian.normalizePath(dir ? dir + '/' + href : href);
-            this.app.workspace.openLinkText(fp, '', 'tab');
+            void this.app.workspace.openLinkText(fp, '', 'tab');
           });
         }
       } else {
@@ -538,15 +567,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         a.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          this.app.workspace.openLinkText(link.target, sourcePath, 'tab');
+          void this.app.workspace.openLinkText(link.target, sourcePath, 'tab');
         });
       }
-
-      el.appendChild(a);
       last = link.end;
     }
     if (last < raw.length) {
-      el.appendChild(document.createTextNode(raw.slice(last)));
+      el.appendText(raw.slice(last));
     }
     if (el.childNodes.length === 0) {
       el.textContent = node.text || PLACEHOLDER;
@@ -939,6 +966,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _render(overlay, content, frontmatter, fileBasename, view, file) {
+    this._injectDoodleFilter(overlay.ownerDocument);
     overlay._stratifyLastContent = content;
     overlay._stratifyView = view;
     overlay._stratifyFile = file;
@@ -986,7 +1014,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     if (!fmNodeStyleValid) fmUpdates['mindmap-node'] = overlay._stratifyNodeStyle;
     if (!fmStructureValid) fmUpdates['mindmap-structure'] = structureId;
     if (Object.keys(fmUpdates).length) {
-      this._batchPersistFrontmatter(file, fmUpdates);
+      void this._batchPersistFrontmatter(file, fmUpdates);
     }
 
     const parsed = this._parseStructured(content, structureId);
@@ -1000,7 +1028,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     if (overlay._stratifyCleanup) overlay._stratifyCleanup();
     overlay.empty();
 
-    const makeIconButton = (parent, icon, label, extraClass) => {
+    const makeIconButton = (parent, icon, label, extraClass = '') => {
       const classes = ['stratify-btn', 'stratify-icon-btn', extraClass || ''].filter(Boolean).join(' ');
       const button = parent.createEl('button', { cls: classes, attr: { type: 'button' } });
       obsidian.setIcon(button, icon);
@@ -1046,7 +1074,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         console.error('[StratifyMindmap] structure mode persist error', e);
         new obsidian.Notice('Failed to change mindmap mode: ' + e.message);
       } finally {
-        requestAnimationFrame(() => { overlay._stratifyWriting = false; });
+        (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
+          overlay._stratifyWriting = false;
+        });
       }
     };
 
@@ -1068,7 +1098,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (overlay._stratifyLayout === id) return;
       overlay._stratifyLayout = id;
       this._renderTreeIntoCanvas(overlay, false);
-      this._persistFrontmatterValue(file, 'mindmap-layout', id);
+      void this._persistFrontmatterValue(file, 'mindmap-layout', id);
     };
 
     const actions = toolbar.createDiv({ cls: 'stratify-toolbar-group stratify-toolbar-actions' });
@@ -1129,14 +1159,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       const swatches = button.createSpan({ cls: 'stratify-theme-swatches', attr: { 'aria-hidden': 'true' } });
       [theme.rootFill].concat(theme.palette.slice(0, 6)).forEach((color) => {
         const swatch = swatches.createSpan({ cls: 'stratify-theme-swatch' });
-        swatch.style.backgroundColor = color;
+        swatch.style.setProperty('--stratify-swatch-color', color);
       });
       button.onclick = () => {
         if (id === overlay._stratifyTheme) return;
         this._applyThemeToOverlay(overlay, id);
         syncThemeButtons();
         if (overlay._stratifyTreeInfo) this._renderTreeIntoCanvas(overlay, true);
-        this._persistFrontmatterValue(file, 'mindmap-theme', id);
+        void this._persistFrontmatterValue(file, 'mindmap-theme', id);
       };
       themeButtons.set(id, button);
     }
@@ -1154,7 +1184,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (!LINE_STYLES[id] || id === overlay._stratifyLine) return;
       overlay._stratifyLine = id;
       if (overlay._stratifyTreeInfo) this._renderTreeIntoCanvas(overlay, true);
-      this._persistFrontmatterValue(file, 'mindmap-line', id);
+      void this._persistFrontmatterValue(file, 'mindmap-line', id);
     };
 
     const nodeGroup = morePanel.createDiv({ cls: 'stratify-toolbar-group stratify-toolbar-field' });
@@ -1169,7 +1199,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (!NODE_STYLES[id] || id === overlay._stratifyNodeStyle) return;
       this._applyNodeStyleToOverlay(overlay, id);
       if (overlay._stratifyTreeInfo) this._renderTreeIntoCanvas(overlay, true);
-      this._persistFrontmatterValue(file, 'mindmap-node', id);
+      void this._persistFrontmatterValue(file, 'mindmap-node', id);
     };
 
     const exportBtn = morePanel.createEl('button', {
@@ -1189,15 +1219,15 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         msg.setText('No supported mindmap nodes were found. Markdown-only content remains preserved in the source.');
       } else if (structureId === 'list') {
         msg.appendText('Add nested list items (e.g. ');
-        msg.createEl('code', { text: '- Root' });
+        msg.createEl('code', { text: '- root' });
         msg.appendText(', ');
-        msg.createEl('code', { text: '  - Branch' });
+        msg.createEl('code', { text: '  - branch' });
         msg.appendText(') to render the mind map.');
       } else if (structureId === 'hybrid') {
         msg.appendText('Add headings or nested list items (e.g. ');
         msg.createEl('code', { text: '# Title' });
         msg.appendText(', ');
-        msg.createEl('code', { text: '- Branch' });
+        msg.createEl('code', { text: '- branch' });
         msg.appendText(') to render the mind map.');
       } else {
         msg.appendText('Add headings (e.g. ');
@@ -1211,9 +1241,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
     const canvas = overlay.createDiv({ cls: 'stratify-canvas' });
     const inner = canvas.createDiv({ cls: 'stratify-inner' });
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'stratify-svg');
-    inner.appendChild(svg);
+    const svg = inner.createSvg('svg', { cls: 'stratify-svg' });
     const nodesLayer = inner.createDiv({ cls: 'stratify-nodes' });
     canvas._stratify = { tx: 0, ty: 0, scale: 1 };
 
@@ -1241,7 +1269,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const tree = treeInfo && treeInfo.tree;
     if (!tree || !canvas) return;
 
-    const savedTransform = preserveTransform ? Object.assign({}, canvas._stratify) : null;
+    const savedTransform = preserveTransform ? { ...canvas._stratify } : null;
 
     nodesLayer.empty();
     while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -1250,7 +1278,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     this._assignColors(tree, theme.palette, theme.rootAccent);
     this._createNodes(tree, nodesLayer, overlay);
 
-    requestAnimationFrame(() => {
+    (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
       this._measureNodes(tree);
       this._layoutTree(tree, overlay._stratifyLayout, overlay);
       const bounds = this._computeBounds(tree);
@@ -1301,13 +1329,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     el.style.setProperty('--stratify-color', node.color);
     el.tabIndex = 0;
     if (node.collapsed && node.children.length) {
-      const textSpan = document.createElement('span');
-      textSpan.className = 'stratify-node-text';
+      const textSpan = el.createSpan({ cls: 'stratify-node-text' });
       this._renderNodeContent(textSpan, node, overlay);
-      el.appendChild(textSpan);
-      const badge = document.createElement('span');
-      badge.className = 'stratify-collapse-badge';
-      el.appendChild(badge);
+      el.createSpan({ cls: 'stratify-collapse-badge' });
     } else {
       this._renderNodeContent(el, node, overlay);
     }
@@ -1359,7 +1383,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
           if (node.dirty) {
             this._pushUndoSnapshot(overlay, overlay._stratifyEditSnapshot);
             overlay._stratifyEditSnapshot = null;
-            this._persistAndRelayout(overlay);
+            void this._persistAndRelayout(overlay);
           }
         } else if (e.key === 'Tab') {
           e.preventDefault();
@@ -1414,7 +1438,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       this._pushUndoSnapshot(overlay);
       node.collapsed = false;
       overlay._stratifyPendingEdit = node;
-      this._persistAndRelayout(overlay);
+      void this._persistAndRelayout(overlay);
       return;
     }
     const el = node._el;
@@ -1430,11 +1454,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     el.classList.add('stratify-editing');
     el.spellcheck = false;
     el.focus({ preventScroll: false });
-    const range = document.createRange();
+    const range = el.ownerDocument.createRange();
     range.selectNodeContents(el);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+    const sel = el.ownerDocument.defaultView?.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
 
     const onBlur = () => {
       el.removeEventListener('blur', onBlur);
@@ -1447,7 +1473,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if ((node.rawText || node.text) !== had) {
         this._pushUndoSnapshot(overlay, overlay._stratifyEditSnapshot);
         overlay._stratifyEditSnapshot = null;
-        this._persistAndRelayout(overlay);
+        void this._persistAndRelayout(overlay);
       }
     };
     el.addEventListener('blur', onBlur);
@@ -1499,7 +1525,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     return (overlay && overlay._stratifyLastContent) || '';
   }
 
-  _pushUndoSnapshot(overlay, content) {
+  _pushUndoSnapshot(overlay, content = null) {
     if (!overlay) return;
     const snapshot = content || this._currentMindmapContent(overlay);
     if (!snapshot) return;
@@ -1510,7 +1536,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     overlay._stratifyRedoStack = [];
   }
 
-  _pushRedoSnapshot(overlay, content) {
+  _pushRedoSnapshot(overlay, content = null) {
     if (!overlay) return;
     const snapshot = content || this._currentMindmapContent(overlay);
     if (!snapshot) return;
@@ -1520,7 +1546,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     if (overlay._stratifyRedoStack.length > 50) overlay._stratifyRedoStack.shift();
   }
 
-  _pushUndoSnapshotForRedo(overlay, content) {
+  _pushUndoSnapshotForRedo(overlay, content = null) {
     if (!overlay) return;
     const snapshot = content || this._currentMindmapContent(overlay);
     if (!snapshot) return;
@@ -1557,7 +1583,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       new obsidian.Notice('Failed to undo mindmap action: ' + e.message);
       return false;
     } finally {
-      requestAnimationFrame(() => { overlay._stratifyWriting = false; });
+      (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
+        overlay._stratifyWriting = false;
+      });
     }
   }
 
@@ -1588,7 +1616,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       new obsidian.Notice('Failed to redo mindmap action: ' + e.message);
       return false;
     } finally {
-      requestAnimationFrame(() => { overlay._stratifyWriting = false; });
+      (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
+        overlay._stratifyWriting = false;
+      });
     }
   }
 
@@ -1617,6 +1647,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     if (overlay._stratifyPointerDrag) return;
 
     const rect = el.getBoundingClientRect();
+    const ownerWindow = el.ownerDocument.defaultView || window;
     const drag = {
       overlay,
       node,
@@ -1636,6 +1667,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       target: null,
       action: null,
       cleanup: null,
+      ownerWindow,
     };
 
     const onMove = (moveEvent) => {
@@ -1652,17 +1684,17 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     };
     const onWindowBlur = () => this._finishNodePointerDrag(drag, false);
     drag.cleanup = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onCancel);
-      window.removeEventListener('blur', onWindowBlur);
+      ownerWindow.removeEventListener('pointermove', onMove);
+      ownerWindow.removeEventListener('pointerup', onUp);
+      ownerWindow.removeEventListener('pointercancel', onCancel);
+      ownerWindow.removeEventListener('blur', onWindowBlur);
     };
 
     overlay._stratifyPointerDrag = drag;
-    window.addEventListener('pointermove', onMove, { passive: false });
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onCancel);
-    window.addEventListener('blur', onWindowBlur);
+    ownerWindow.addEventListener('pointermove', onMove, { passive: false });
+    ownerWindow.addEventListener('pointerup', onUp);
+    ownerWindow.addEventListener('pointercancel', onCancel);
+    ownerWindow.addEventListener('blur', onWindowBlur);
   }
 
   _updateNodePointerDrag(drag, e) {
@@ -1689,24 +1721,16 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     ghost.classList.remove('stratify-selected', 'stratify-drop-before', 'stratify-drop-after', 'stratify-drop-child');
     ghost.classList.add('stratify-drag-ghost');
     ghost.removeAttribute('tabindex');
-    ghost.style.position = 'fixed';
-    ghost.style.left = '0px';
-    ghost.style.top = '0px';
-    ghost.style.right = 'auto';
-    ghost.style.bottom = 'auto';
-    ghost.style.margin = '0';
-    ghost.style.boxSizing = 'border-box';
-    ghost.style.transformOrigin = 'top left';
     ghost.style.width = drag.width + 'px';
     ghost.style.height = drag.height + 'px';
-    document.body.appendChild(ghost);
+    drag.sourceEl.ownerDocument.body.appendChild(ghost);
     drag.ghost = ghost;
     this._scheduleNodeDragFrame(drag);
   }
 
   _scheduleNodeDragFrame(drag) {
     if (drag.frame) return;
-    drag.frame = requestAnimationFrame(() => {
+    drag.frame = drag.ownerWindow.requestAnimationFrame(() => {
       drag.frame = null;
       this._renderNodeDragFrame(drag);
     });
@@ -1732,7 +1756,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   _finishNodePointerDrag(drag, commit) {
     if (!drag || drag.overlay._stratifyPointerDrag !== drag) return;
     if (drag.cleanup) drag.cleanup();
-    if (drag.frame) cancelAnimationFrame(drag.frame);
+    if (drag.frame) drag.ownerWindow.cancelAnimationFrame(drag.frame);
     if (drag.ghost) drag.ghost.remove();
     drag.sourceEl.classList.remove('stratify-drag-source');
     drag.overlay.classList.remove('stratify-node-dragging');
@@ -1742,7 +1766,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
     if (drag.active) {
       drag.overlay._stratifySuppressNodeClick = true;
-      setTimeout(() => {
+      drag.ownerWindow.setTimeout(() => {
         if (drag.overlay) drag.overlay._stratifySuppressNodeClick = false;
       }, 0);
     }
@@ -1755,7 +1779,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     return this._getDropActionAt(e.clientX, e.clientY, dragNode, targetNode);
   }
 
-  _getDropActionAt(clientX, clientY, dragNode, targetNode, overlay) {
+  _getDropActionAt(clientX, clientY, dragNode, targetNode, overlay = null) {
     if (!this._isMovableNode(dragNode) || !targetNode || targetNode.isVirtual) return null;
     if (dragNode === targetNode || this._isAncestorNode(dragNode, targetNode)) return null;
     const rect = targetNode._el && targetNode._el.getBoundingClientRect();
@@ -1802,7 +1826,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _getDirectDropTarget(overlay, sourceEl, clientX, clientY) {
-    const el = document.elementFromPoint(clientX, clientY);
+    const el = overlay.ownerDocument.elementFromPoint(clientX, clientY);
     const nodeEl = el && el.closest && el.closest('.stratify-node');
     if (!nodeEl || nodeEl === sourceEl || !overlay.contains(nodeEl)) return null;
     return nodeEl._stratifyNode || null;
@@ -1869,7 +1893,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   _persistMove(overlay, node) {
     overlay._stratifySelected = node;
     overlay._stratifyPendingEdit = null;
-    this._persistAndRelayout(overlay);
+    void this._persistAndRelayout(overlay);
     return true;
   }
 
@@ -2069,7 +2093,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _visibleNodes(overlay) {
-    return Array.from(overlay.querySelectorAll('.stratify-node'))
+    return Array.from(overlay.querySelectorAll('.stratify-node') as NodeListOf<StratifyElement>)
       .map((el) => el._stratifyNode)
       .filter((node) => node && node._el);
   }
@@ -2077,12 +2101,12 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   // ─── Wiki-link mention autocomplete ────────────────────────────
 
   _getMentionQuery(el) {
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return null;
+    const sel = el.ownerDocument.defaultView?.getSelection();
+    if (!sel || !sel.rangeCount) return null;
     const range = sel.getRangeAt(0);
     if (!range.collapsed) return null;
     const textNode = range.startContainer;
-    if (textNode.nodeType !== Node.TEXT_NODE) return null;
+    if (textNode.nodeType !== textNode.TEXT_NODE) return null;
     const offset = range.startOffset;
     const text = textNode.textContent;
     const before = text.slice(0, offset);
@@ -2095,11 +2119,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
   _renderMentionPopup(overlay, items) {
     this._closeMentionPopup(overlay);
-    const popup = document.createElement('div');
-    popup.className = 'stratify-mention-popup';
+    const popup = overlay.ownerDocument.body.createDiv({ cls: 'stratify-mention-popup' });
     items.forEach((item, i) => {
-      const row = document.createElement('div');
-      row.className = 'stratify-mention-item';
+      const row = popup.createDiv({ cls: 'stratify-mention-item' });
       if (i === 0) row.classList.add('stratify-mention-active');
       row.textContent = item.basename;
       row.title = item.path;
@@ -2107,15 +2129,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         e.preventDefault();
         this._insertMention(overlay, item);
       });
-      popup.appendChild(row);
     });
-    document.body.appendChild(popup);
 
     const node = overlay._stratifyEditingNode;
     if (node && node._el) {
       const rect = node._el.getBoundingClientRect();
-      popup.style.left = rect.left + 'px';
-      popup.style.top = rect.bottom + 4 + 'px';
+      popup.style.setProperty('--stratify-popup-left', rect.left + 'px');
+      popup.style.setProperty('--stratify-popup-top', rect.bottom + 4 + 'px');
     }
     overlay._stratifyMention = { popup, index: 0, items };
   }
@@ -2168,14 +2188,16 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
     // Place cursor after the inserted link
     const pos = beforeQuery.length + insert.length;
-    const range = document.createRange();
+    const range = el.ownerDocument.createRange();
     const textNode = el.firstChild;
     if (textNode) {
       range.setStart(textNode, Math.min(pos, textNode.textContent.length));
       range.collapse(true);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
+      const sel = el.ownerDocument.defaultView?.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
     }
     this._closeMentionPopup(overlay);
     el.focus();
@@ -2231,7 +2253,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     }
     overlay._stratifyWriting = true;
     this._writeMindmapContent(overlay, newContent).then(() => {
-      requestAnimationFrame(() => { overlay._stratifyWriting = false; });
+      (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
+        overlay._stratifyWriting = false;
+      });
     }).catch((e) => {
       overlay._stratifyWriting = false;
       console.error('[StratifyMindmap] collapse persist error', e);
@@ -2277,7 +2301,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         newNode.parent = virt;
         virt.children.push(newNode);
         overlay._stratifyPendingEdit = edit ? newNode : null;
-        this._persistAndRelayout(overlay);
+        void this._persistAndRelayout(overlay);
         return;
       }
       return;
@@ -2290,10 +2314,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     newNode.parent = parent;
     parent.children.splice(idx + 1, 0, newNode);
     overlay._stratifyPendingEdit = edit ? newNode : null;
-    this._persistAndRelayout(overlay);
+    void this._persistAndRelayout(overlay);
   }
 
-  _addChild(overlay, node, edit, undoSnapshot) {
+  _addChild(overlay, node, edit, undoSnapshot = null) {
     this._pushUndoSnapshot(overlay, undoSnapshot);
     if (node.collapsed && node.children && node.children.length) {
       node.collapsed = false;
@@ -2302,15 +2326,11 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     newNode.parent = node;
     node.children.push(newNode);
     overlay._stratifyPendingEdit = edit ? newNode : null;
-    this._persistAndRelayout(overlay);
+    void this._persistAndRelayout(overlay);
   }
 
   _isZh() {
-    try {
-      return typeof window !== 'undefined' && (window.localStorage.getItem('language') || 'en').startsWith('zh');
-    } catch (e) {
-      return false;
-    }
+    return obsidian.getLanguage().startsWith('zh');
   }
 
   _showNodeContextMenu(overlay, node, e) {
@@ -2388,7 +2408,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       placeholder.parent = treeInfo.tree;
       treeInfo.tree.children.push(placeholder);
     }
-    this._persistAndRelayout(overlay);
+    void this._persistAndRelayout(overlay);
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -2421,7 +2441,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     try {
       overlay._stratifyWriting = true;
       await this._writeMindmapContent(overlay, newContent);
-      requestAnimationFrame(() => { overlay._stratifyWriting = false; });
+      (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
+        overlay._stratifyWriting = false;
+      });
     } catch (e) {
       overlay._stratifyWriting = false;
       console.error('[StratifyMindmap] persist error', e);
@@ -2673,14 +2695,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
   _applyNodePositions(node) {
     if (node._el) {
-      node._el.style.left = node.x + 'px';
-      node._el.style.top = node.y + 'px';
+      node._el.style.setProperty('--stratify-node-x', node.x + 'px');
+      node._el.style.setProperty('--stratify-node-y', node.y + 'px');
     }
     if (node.collapsed) return;
     for (const c of node.children) this._applyNodePositions(c);
   }
 
-  _computeBounds(node, b) {
+  _computeBounds(node, b = null) {
     b = b || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
     b.minX = Math.min(b.minX, node.x);
     b.minY = Math.min(b.minY, node.y);
@@ -2723,7 +2745,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         endX = parentLeft ? child.x : child.x + child.width;
         endY = child.y + child.height / 2;
       }
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const path = svg.createSvg('path');
       let d;
       if (style.shape === 'straight') {
         d = `M ${startX} ${startY} L ${endX} ${endY}`;
@@ -2764,7 +2786,6 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       path.setAttribute('stroke-linejoin', 'round');
       if (style.dash) path.setAttribute('stroke-dasharray', style.dash);
       path.classList.add('stratify-conn');
-      svg.appendChild(path);
       this._drawConnections(child, svg, layout, lineId);
     }
   }
@@ -2780,6 +2801,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _bindPanZoom(canvas, inner, overlay) {
+    const ownerWindow = canvas.ownerDocument.defaultView || window;
     let dragging = false;
     let sx = 0, sy = 0, stx = 0, sty = 0;
     const onDown = (e) => {
@@ -2807,13 +2829,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     };
     const onUp = () => { dragging = false; canvas.classList.remove('stratify-dragging'); };
     canvas.addEventListener('mousedown', onDown);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    ownerWindow.addEventListener('mousemove', onMove);
+    ownerWindow.addEventListener('mouseup', onUp);
     const prevCleanup = overlay._stratifyCleanup;
     overlay._stratifyCleanup = () => {
       if (prevCleanup) prevCleanup();
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      ownerWindow.removeEventListener('mousemove', onMove);
+      ownerWindow.removeEventListener('mouseup', onUp);
     };
 
     // ── Touch support ──
@@ -2951,23 +2973,45 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
   }
 
-  _injectDoodleFilter() {
-    if (document.getElementById('stratify-doodle-filter')) return;
-    const svgNS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('width', '0');
-    svg.setAttribute('height', '0');
-    svg.style.position = 'absolute';
-    svg.style.pointerEvents = 'none';
-    svg.innerHTML = `
-      <defs>
-        <filter id="doodle-filter" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="3" result="turbulence" seed="2"/>
-          <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="2" xChannelSelector="R" yChannelSelector="G"/>
-        </filter>
-      </defs>
-    `;
-    document.body.appendChild(svg);
+  _injectDoodleFilter(ownerDocument = activeDocument) {
+    if (ownerDocument.getElementById('stratify-doodle-filter')) return;
+    const svg = ownerDocument.body.createSvg('svg', {
+      attr: {
+        id: 'stratify-doodle-filter',
+        width: '0',
+        height: '0',
+        'aria-hidden': 'true',
+      },
+      cls: 'stratify-doodle-filter-host',
+    });
+    const defs = svg.createSvg('defs');
+    const filter = defs.createSvg('filter', {
+      attr: {
+        id: 'doodle-filter',
+        x: '-5%',
+        y: '-5%',
+        width: '110%',
+        height: '110%',
+      },
+    });
+    filter.createSvg('feTurbulence', {
+      attr: {
+        type: 'turbulence',
+        baseFrequency: '0.02',
+        numOctaves: '3',
+        result: 'turbulence',
+        seed: '2',
+      },
+    });
+    filter.createSvg('feDisplacementMap', {
+      attr: {
+        in: 'SourceGraphic',
+        in2: 'turbulence',
+        scale: '2',
+        xChannelSelector: 'R',
+        yChannelSelector: 'G',
+      },
+    });
   }
 
   _isDarkColor(hex) {
@@ -3366,32 +3410,16 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     }
   }
 
-  async _saveWithDialog(file, arrayBuffer) {
-    const uint8 = new Uint8Array(arrayBuffer);
-    const defaultName = (file.basename || 'mindmap') + '.mindmap.png';
-
-    if (this.app.isMobile) {
-      const filePath = (file.parent ? file.parent.path + '/' : '') + defaultName;
-      await this.app.vault.adapter.writeBinary(filePath, uint8);
-      return true;
+  async _savePngToVault(file, arrayBuffer) {
+    const folderPath = file.parent && file.parent.path ? file.parent.path + '/' : '';
+    const filePath = obsidian.normalizePath(folderPath + file.basename + '.mindmap.png');
+    const existing = this.app.vault.getAbstractFileByPath(filePath);
+    if (existing instanceof obsidian.TFile) {
+      await this.app.vault.modifyBinary(existing, arrayBuffer);
+    } else {
+      await this.app.vault.createBinary(filePath, arrayBuffer);
     }
-
-    try {
-      const electron = require('electron');
-      const win = electron.remote.BrowserWindow.getFocusedWindow();
-      const result = await electron.remote.dialog.showSaveDialog(win, {
-        title: 'Export Mindmap as PNG',
-        defaultPath: defaultName,
-        filters: [{ name: 'PNG Image', extensions: ['png'] }]
-      });
-      if (result.canceled || !result.filePath) return false;
-      require('fs').writeFileSync(result.filePath, Buffer.from(arrayBuffer));
-      return true;
-    } catch (e) {
-      const filePath = (file.parent ? file.parent.path + '/' : '') + defaultName;
-      await this.app.vault.adapter.writeBinary(filePath, uint8);
-      return true;
-    }
+    return filePath;
   }
 
   async _exportPNG(overlay) {
@@ -3434,7 +3462,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       saveAndShift(tree);
 
       // Create offscreen canvas
-      const canvas = document.createElement('canvas');
+      const canvas = overlay.ownerDocument.createElement('canvas');
       canvas.width = w * scale;
       canvas.height = h * scale;
       const ctx = canvas.getContext('2d');
@@ -3464,18 +3492,17 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       }
 
       // Convert canvas to blob
-      const blob = await new Promise((resolve, reject) => {
+      const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => {
           if (b) resolve(b);
           else reject(new Error('Failed to create PNG'));
         }, 'image/png');
       });
 
-      // Prompt user for save location
+      // Save beside the source note so export works consistently on desktop and mobile.
       const arrayBuffer = await blob.arrayBuffer();
-      const saved = await this._saveWithDialog(file, arrayBuffer);
-      if (!saved) return;
-      new obsidian.Notice('Mindmap exported successfully');
+      const exportedPath = await this._savePngToVault(file, arrayBuffer);
+      new obsidian.Notice('Mind map exported to ' + exportedPath);
     } catch (e) {
       console.error('[StratifyMindmap] export error:', e);
       new obsidian.Notice('Export failed: ' + e.message);
@@ -3484,19 +3511,22 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 }
 
 class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
+  plugin: StratifyMindmapPlugin;
+
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
 
   display() {
+    this.renderSettings();
+  }
+
+  renderSettings() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl('h2', { text: 'Stratify Mindmap' });
-
-    containerEl.createEl('h3', { text: 'Default mindmap options' });
     containerEl.createEl('p', {
-      text: 'These defaults are used for new mindmaps, converted notes, and mindmap notes that do not already define the matching frontmatter field.'
+      text: 'These defaults apply to new mind maps, converted notes, and notes without the matching frontmatter field.'
     });
 
     this.addDropdownSetting(
@@ -3535,7 +3565,9 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
       NODE_STYLES
     );
 
-    containerEl.createEl('h3', { text: 'Display' });
+    new obsidian.Setting(containerEl)
+      .setName('Display')
+      .setHeading();
 
     new obsidian.Setting(containerEl)
       .setName('Node font size')
@@ -3543,25 +3575,26 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
       .addSlider((slider) => {
         slider
           .setLimits(MIN_NODE_FONT_SIZE, MAX_NODE_FONT_SIZE, 1)
-          .setValue(this.plugin.settings.nodeFontSize)
-          .setDynamicTooltip()
+          .setValue(this.plugin.pluginSettings.nodeFontSize)
           .onChange(async (value) => {
-            this.plugin.settings.nodeFontSize = value;
+            this.plugin.pluginSettings.nodeFontSize = value;
             await this.plugin.saveSettings();
             this.plugin._refreshDisplaySettings();
           });
       });
 
-    containerEl.createEl('h3', { text: 'Interaction' });
+    new obsidian.Setting(containerEl)
+      .setName('Interaction')
+      .setHeading();
 
     new obsidian.Setting(containerEl)
       .setName('Arrow-key node navigation')
       .setDesc('Use plain arrow keys to move selection between visible nodes. Existing shortcuts such as Shift+Arrow and Cmd/Ctrl+Arrow are unchanged.')
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.keyboardNavigation !== false)
+          .setValue(this.plugin.pluginSettings.keyboardNavigation !== false)
           .onChange(async (value) => {
-            this.plugin.settings.keyboardNavigation = value;
+            this.plugin.pluginSettings.keyboardNavigation = value;
             await this.plugin.saveSettings();
           });
       });
@@ -3571,9 +3604,9 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
       .setDesc('When dragging onto the outside edge of a leaf node, make the dragged node a child of that leaf. Top and bottom zones still insert before or after the target.')
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.leafOutsideDropCreatesChild !== false)
+          .setValue(this.plugin.pluginSettings.leafOutsideDropCreatesChild !== false)
           .onChange(async (value) => {
-            this.plugin.settings.leafOutsideDropCreatesChild = value;
+            this.plugin.pluginSettings.leafOutsideDropCreatesChild = value;
             await this.plugin.saveSettings();
           });
       });
@@ -3585,10 +3618,10 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
         button
           .setButtonText('Reset')
           .onClick(async () => {
-            this.plugin.settings = Object.assign({}, DEFAULT_PLUGIN_SETTINGS);
+            this.plugin.pluginSettings = { ...DEFAULT_PLUGIN_SETTINGS };
             await this.plugin.saveSettings();
             this.plugin._refreshDisplaySettings();
-            this.display();
+            this.renderSettings();
           });
       });
   }
@@ -3605,20 +3638,20 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
       const swatches = preview.createSpan({ cls: 'stratify-theme-swatches', attr: { 'aria-hidden': 'true' } });
       [theme.rootFill].concat(theme.palette.slice(0, 6)).forEach((color) => {
         const swatch = swatches.createSpan({ cls: 'stratify-theme-swatch' });
-        swatch.style.backgroundColor = color;
+        swatch.style.setProperty('--stratify-swatch-color', color);
       });
     };
     setting.addDropdown((dropdown) => {
       for (const id of Object.keys(THEMES)) dropdown.addOption(id, THEMES[id].name);
       dropdown
-        .setValue(this.plugin.settings.defaultTheme)
+        .setValue(this.plugin.pluginSettings.defaultTheme)
         .onChange(async (value) => {
-          this.plugin.settings.defaultTheme = value;
+          this.plugin.pluginSettings.defaultTheme = value;
           await this.plugin.saveSettings();
           renderPreview(value);
         });
     });
-    renderPreview(this.plugin.settings.defaultTheme);
+    renderPreview(this.plugin.pluginSettings.defaultTheme);
   }
 
   addDropdownSetting(name, desc, key, options) {
@@ -3630,17 +3663,14 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
           dropdown.addOption(id, options[id].name || id);
         }
         dropdown
-          .setValue(this.plugin.settings[key])
+          .setValue(this.plugin.pluginSettings[key])
           .onChange(async (value) => {
-            this.plugin.settings[key] = value;
+            this.plugin.pluginSettings[key] = value;
             await this.plugin.saveSettings();
-            this.display();
+            this.renderSettings();
           });
       });
   }
 }
 
-module.exports = StratifyMindmapPlugin;
-
-/* nosourcemap */
-/* nosourcemap */
+export default StratifyMindmapPlugin;

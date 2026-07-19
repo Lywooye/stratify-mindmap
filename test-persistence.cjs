@@ -1,7 +1,9 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
 const Module = require('module');
+const path = require('path');
 const originalLoad = Module._load;
 
 function parseYaml(source) {
@@ -33,9 +35,14 @@ Module._load = function (request, parent, isMain) {
 
 global.requestAnimationFrame = (callback) => callback();
 
-const Plugin = require(process.env.STRATIFY_MAIN || './main.js');
+const mainPath = path.resolve(process.env.STRATIFY_MAIN || './main.js');
+const pluginModule = new Module(mainPath + '.cjs', module);
+pluginModule.filename = mainPath + '.cjs';
+pluginModule.paths = Module._nodeModulePaths(path.dirname(mainPath));
+pluginModule._compile(fs.readFileSync(mainPath, 'utf8'), pluginModule.filename);
+const Plugin = pluginModule.exports.default;
 const plugin = Object.create(Plugin.prototype);
-plugin.settings = {
+plugin.pluginSettings = {
   defaultStructure: 'list',
   defaultLayout: 'right',
   defaultTheme: 'minimal',
@@ -59,6 +66,7 @@ const editor = {
   },
   setValue: (value) => {
     editorValue = value;
+    diskValue = value;
     editorSetCount += 1;
   },
 };
@@ -74,9 +82,9 @@ plugin.app = {
       vaultReadCount += 1;
       return diskValue;
     },
-    modify: async (target, value) => {
+    process: async (target, update) => {
       assert.strictEqual(target, file);
-      diskValue = value;
+      diskValue = update(diskValue);
       writeCount += 1;
     },
   },
@@ -99,7 +107,14 @@ async function run() {
     contains: (name) => name === 'stratify-hidden' && sourceVisible,
   };
   overlay.dataset = {};
-  view.contentEl = { querySelector: () => overlay };
+  overlay.ownerDocument = {
+    defaultView: { requestAnimationFrame: (callback) => callback() },
+  };
+  view.contentEl = {
+    querySelector: () => overlay,
+    addClass: () => {},
+    removeClass: () => {},
+  };
 
   const undoSnapshot = plugin._currentMindmapContent(overlay);
   plugin._updateNodeText(treeInfo.tree, 'Renamed Root');
@@ -112,8 +127,8 @@ async function run() {
   plugin._addChild(overlay, treeInfo.tree, true, undoSnapshot);
   await pendingPersist;
 
-  assert.strictEqual(writeCount, 1);
-  assert.strictEqual(editorSetCount, 0, 'saving should keep Light Mindmap\'s single vault write behavior');
+  assert.strictEqual(writeCount, 0, 'an open mind map should not bypass the Editor API');
+  assert.strictEqual(editorSetCount, 1, 'saving an open mind map should use one Editor API write');
 
   const renderedContents = [];
   plugin._render = (targetOverlay, content) => renderedContents.push(content);
@@ -140,7 +155,7 @@ async function run() {
   assert.strictEqual(reopenedTree.tree.children.length, 1);
   assert.strictEqual(reopenedTree.tree.children[0].rawText, 'New Title');
 
-  const beforeModeWrite = writeCount;
+  const beforeModeWrite = editorSetCount;
   const headingContent = plugin._serializeMindmap(
     overlay._stratifyParsed,
     overlay._stratifyTreeInfo,
@@ -151,7 +166,7 @@ async function run() {
   overlay._stratifyWriting = true;
   await plugin._writeMindmapContent(overlay, headingContent);
   overlay._stratifyWriting = false;
-  assert.strictEqual(writeCount, beforeModeWrite + 1, 'mode changes must persist as one complete write');
+  assert.strictEqual(editorSetCount, beforeModeWrite + 1, 'mode changes must persist as one complete editor write');
   assert.strictEqual(diskValue, headingContent);
 
   const broken = headingContent.replace('mindmap-structure: heading', 'mindmap-structure: list');

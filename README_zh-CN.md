@@ -97,24 +97,24 @@ mindmap-node: rounded
 
 ## 工具栏与设置
 
-主工具栏保留 Mode、Layout、适应画布、缩放和编辑 Markdown。右侧外观菜单会用名称和色块直接展示所有主题，下面是连线、节点形状和 PNG 导出。
+主工具栏保留 Mode、Layout、适应画布、缩放和编辑 Markdown。右侧外观菜单会用名称和色块直接展示所有主题，下面是连线、节点形状和 PNG 导出。桌面端和移动端都会把导出的图片保存在源笔记旁，文件名为 `<笔记名>.mindmap.png`。
 
 Obsidian 设置页面可指定新导图的默认结构、布局、主题、连线和节点样式，也可以调整全局节点字号、方向键导航与叶节点拖拽行为。修改默认值不会覆盖已有笔记的 frontmatter。
 
 ## 新建与转换
 
-- 使用左侧 ribbon 或命令面板中的 **Convert current note to Stratify mindmap**。
-- 右键 Markdown 文件并选择 **Convert to Stratify mindmap**。
-- 右键文件夹并选择 **Create Stratify mindmap**。
+- 使用左侧 ribbon 或命令面板中的 **Convert current note to mind map**。
+- 右键 Markdown 文件并选择 **Convert to Stratify mind map**。
+- 右键文件夹并选择 **Create Stratify mind map**。
 
 转换只添加所需 frontmatter 并识别正文结构，不会重写原正文。
 
 ## 安装
 
-Stratify Mindmap 目前采用手动安装，尚未进入 Obsidian 社区插件市场。
+在 Stratify Mindmap 进入 Obsidian 社区插件市场之前，可以从 GitHub Release 手动安装：
 
 1. 新建 `<vault>/.obsidian/plugins/stratify-mindmap/`。
-2. 将 `main.js`、`manifest.json`、`styles.css` 放入该目录。
+2. 下载 Release 中的 `main.js`、`manifest.json`、`styles.css`，并放入该目录。
 3. 重新加载 Obsidian。
 4. 在 **设置 -> 社区插件** 中启用 **Stratify Mindmap**。
 
@@ -126,9 +126,24 @@ Stratify 保留了 `type: mindmap` 和现有 `mindmap-*` frontmatter，因此旧
 
 ## 兼容性
 
-- Obsidian 1.4.0 或更高版本
+- Obsidian 1.8.7 或更高版本
 - 支持 macOS、Windows、Linux、iOS 和 Android
 - 导图内容仍是 Markdown，因此兼容 Obsidian Sync
+
+## 隐私与网络
+
+Stratify Mindmap 完全在本地离线运行。它不会发起网络请求、收集遥测、展示广告、访问当前 Vault 以外的文件，也不包含自行更新机制。插件只会读写思维导图笔记、用户主动导出的 PNG 文件和本地插件设置。
+
+## 开发
+
+仓库中的 TypeScript 源码位于 `src/`；生成的 `main.js` 只作为 GitHub Release 附件发布。
+
+```bash
+npm install
+npm run check
+```
+
+`npm run check` 会依次运行 Obsidian 官方 ESLint 规则、持久化回归测试、TypeScript 检查和生产构建。
 
 ## 致谢与许可证
 
