@@ -28,15 +28,15 @@ The images below are interface previews of the current Stratify layout.
 
 ### Mind Map Overview
 
-![Stratify Mindmap desktop overview](assets/desktop-overview.png)
+![Stratify Mindmap desktop overview](https://raw.githubusercontent.com/Lywooye/stratify-mindmap/main/assets/desktop-overview.png)
 
 ### Appearance and Export Menu
 
-![Stratify Mindmap appearance and export menu](assets/appearance-menu.png)
+![Stratify Mindmap appearance and export menu](https://raw.githubusercontent.com/Lywooye/stratify-mindmap/main/assets/appearance-menu.png)
 
 ### Mobile Toolbar
 
-<img src="assets/mobile-toolbar.png" alt="Stratify Mindmap mobile toolbar and appearance menu" width="390">
+<img src="https://raw.githubusercontent.com/Lywooye/stratify-mindmap/main/assets/mobile-toolbar.png" alt="Stratify Mindmap mobile toolbar and appearance menu" width="390">
 
 ## Markdown Structure Modes
 
@@ -93,6 +93,8 @@ Normal rendering, node editing, and structure-mode conversion preserve this cont
 | Undo | `Mod + Z` |
 | Redo | `Mod + Shift + Z` or `Mod + Y` |
 
+Collapsed state is stored by wrapping the complete node label in single emphasis markers, for example `# *Deferred*`. A heading or list label written this way is therefore interpreted as a collapsed node.
+
 Dragging onto the upper or lower part of a node inserts before or after it. Dropping on the outer edge of a leaf can make the dragged node its child; this behavior can be disabled in settings.
 
 ## Toolbar and Settings
@@ -143,7 +145,7 @@ npm install
 npm run check
 ```
 
-`npm run check` runs the official Obsidian ESLint rules, the persistence regression test, TypeScript validation, and the production build.
+`npm run check` runs the official Obsidian ESLint rules, regression tests, TypeScript validation, and the production build.
 
 ## Credits and License
 

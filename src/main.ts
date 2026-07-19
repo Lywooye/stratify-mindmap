@@ -123,11 +123,13 @@ const PLACEHOLDER = 'New Title';
 
 class StratifyMindmapPlugin extends obsidian.Plugin {
   pluginSettings = { ...DEFAULT_PLUGIN_SETTINGS };
-  _scan!: () => void;
+  _scan!: obsidian.Debouncer<[], Promise<void>>;
+  _unloading = false;
   _fileCache: obsidian.TFile[] | null = null;
   _fileCacheTime = 0;
 
   async onload() {
+    this._unloading = false;
     await this.loadSettings();
     this._scan = obsidian.debounce(() => this._doScan(), 120);
     this._fileCache = null;
@@ -218,7 +220,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       }
     }));
 
-    this.app.workspace.onLayoutReady(() => this._doScan());
+    this.app.workspace.onLayoutReady(() => {
+      if (!this._unloading) void this._doScan();
+    });
 
     // Inject SVG filter for doodle node style
     this._injectDoodleFilter();
@@ -389,6 +393,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   onunload() {
+    this._unloading = true;
+    this._scan?.cancel();
     const documents = new Set<Document>([activeDocument]);
     for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
       const view = leaf.view;
@@ -405,12 +411,15 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     }
     for (const ownerDocument of documents) {
       ownerDocument.getElementById('stratify-doodle-filter')?.remove();
+      ownerDocument.querySelectorAll('.stratify-mention-popup').forEach((el) => el.remove());
     }
   }
 
   async _doScan() {
+    if (this._unloading) return;
     const leaves = this.app.workspace.getLeavesOfType('markdown');
     for (const leaf of leaves) {
+      if (this._unloading) return;
       const view = leaf.view;
       if (!(view instanceof obsidian.MarkdownView)) continue;
       const file = view.file;
@@ -428,6 +437,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         } catch {
           content = await this._readFileContent(file);
         }
+        if (this._unloading) return;
         let overlay = existing;
         if (!overlay) {
           overlay = view.contentEl.createDiv({ cls: 'stratify-overlay' });
@@ -513,6 +523,11 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       .trim();
   }
 
+  _safeExternalHref(target) {
+    const href = String(target || '').trim();
+    return /^(?:https?:\/\/|obsidian:\/\/)/i.test(href) ? href : null;
+  }
+
   _renderNodeContent(el, node, overlay) {
     const raw = node.rawText || node.text || '';
     if (!raw.includes('](') && !raw.includes('[[')) {
@@ -544,10 +559,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       const a = el.createEl('a', { cls: 'stratify-link', text: link.text });
 
       if (link.type === 'md') {
-        const href = link.target;
-        a.href = href;
-        const isExternal = /^https?:\/\//.test(href) || href.startsWith('obsidian://');
-        if (isExternal) {
+        const href = String(link.target || '').trim();
+        const externalHref = this._safeExternalHref(href);
+        if (externalHref) {
+          a.href = externalHref;
           a.target = '_blank';
           a.rel = 'noopener';
         } else {
@@ -704,7 +719,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     let virtualRoot = false;
     const baseLevel = minLevel;
 
-    if (tops.length > 1) {
+    if (tops.length > 1 || items[0].level !== minLevel) {
       tree = {
         level: minLevel - 1,
         rawText: fileName || 'Mind Map',
@@ -1021,7 +1036,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     overlay._stratifyPendingEdit = null;
     overlay._stratifyEditingNode = null;
 
-    if (overlay._stratifyCleanup) overlay._stratifyCleanup();
+    if (overlay._stratifyCleanup) {
+      overlay._stratifyCleanup();
+      overlay._stratifyCleanup = null;
+    }
     overlay.empty();
 
     const makeIconButton = (parent, icon, label, extraClass = '') => {
@@ -1275,7 +1293,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     this._createNodes(tree, nodesLayer, overlay);
 
     (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
-      this._measureNodes(tree);
+      const measureScale = (canvas._stratify && canvas._stratify.scale) || 1;
+      this._measureNodes(tree, measureScale);
       this._layoutTree(tree, overlay._stratifyLayout, overlay);
       const bounds = this._computeBounds(tree);
       const w = bounds.maxX - bounds.minX + PAD * 2;
@@ -2474,12 +2493,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   // Layout & geometry.
   // ────────────────────────────────────────────────────────────────
 
-  _measureNodes(node) {
+  _measureNodes(node, scale = 1) {
+    const measureScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
     const r = node._el.getBoundingClientRect();
-    node.width = Math.max(r.width, 40);
-    node.height = Math.max(r.height, 24);
+    node.width = Math.max(r.width / measureScale, 40);
+    node.height = Math.max(r.height / measureScale, 24);
     if (node.collapsed) return;
-    for (const c of node.children) this._measureNodes(c);
+    for (const c of node.children) this._measureNodes(c, measureScale);
   }
 
   _computeSubtreeHeight(node) {
@@ -2918,11 +2938,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       const rect = canvas.getBoundingClientRect();
       const ox = e.clientX - rect.left;
       const oy = e.clientY - rect.top;
-      const s = canvas._stratify;
-      s.tx = ox - (ox - s.tx) * factor;
-      s.ty = oy - (oy - s.ty) * factor;
-      s.scale = Math.max(0.2, Math.min(3, s.scale * factor));
-      this._applyTransform(inner, s);
+      this._zoomAt(canvas, inner, factor, ox, oy);
       e.preventDefault();
     }, { passive: false });
   }
@@ -2945,12 +2961,18 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _zoomBy(canvas, inner, factor) {
-    const s = canvas._stratify;
     const cx = canvas.clientWidth / 2;
     const cy = canvas.clientHeight / 2;
-    s.tx = cx - (cx - s.tx) * factor;
-    s.ty = cy - (cy - s.ty) * factor;
-    s.scale = Math.max(0.2, Math.min(3, s.scale * factor));
+    this._zoomAt(canvas, inner, factor, cx, cy);
+  }
+
+  _zoomAt(canvas, inner, factor, ox, oy) {
+    const s = canvas._stratify;
+    const newScale = Math.max(0.2, Math.min(3, s.scale * factor));
+    const realFactor = newScale / s.scale;
+    s.tx = ox - (ox - s.tx) * realFactor;
+    s.ty = oy - (oy - s.ty) * realFactor;
+    s.scale = newScale;
     this._applyTransform(inner, s);
   }
 
@@ -2963,8 +2985,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   // PNG Export helpers
   // ────────────────────────────────────────────────────────────────
 
-  _hexToRgb(hex) {
-    const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  _hexToRgb(color) {
+    const value = String(color || '').trim();
+    const rgb = value.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+    if (rgb) return [rgb[1], rgb[2], rgb[3]].map((channel) => Math.round(Number(channel)));
+    let hex = value.replace('#', '');
+    if (/^[0-9a-f]{3}$/i.test(hex)) hex = hex.replace(/./g, (channel) => channel + channel);
+    const m = hex.match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
     if (!m) return [0, 0, 0];
     return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
   }
@@ -3466,14 +3493,16 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       // Get background color
       let bgColor = theme.bg;
       if (!bgColor) {
-        const computedStyle = getComputedStyle(overlay);
+        const ownerWindow = overlay.ownerDocument.defaultView || window;
+        const computedStyle = ownerWindow.getComputedStyle(overlay);
         bgColor = computedStyle.getPropertyValue('--stratify-theme-bg').trim() ||
                   computedStyle.getPropertyValue('--background-primary').trim() ||
                   '#FFFFFF';
       }
       ctx.fillStyle = bgColor;
+      const normalizedBgColor = typeof ctx.fillStyle === 'string' ? ctx.fillStyle : bgColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const exportTheme = Object.assign({}, theme, { bg: bgColor });
+      const exportTheme = Object.assign({}, theme, { bg: normalizedBgColor });
 
       // Draw connections
       this._drawConnectionsToCanvas(ctx, tree, layout, lineStyle, scale);

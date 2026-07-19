@@ -36,6 +36,10 @@ Module._load = function (request, parent, isMain) {
 global.requestAnimationFrame = (callback) => callback();
 
 const mainPath = path.resolve(process.env.STRATIFY_MAIN || './main.js');
+if (!fs.existsSync(mainPath)) {
+  console.error('main.js not found - run "npm run build" first (npm run check does this automatically).');
+  process.exit(1);
+}
 const pluginModule = new Module(mainPath + '.cjs', module);
 pluginModule.filename = mainPath + '.cjs';
 pluginModule.paths = Module._nodeModulePaths(path.dirname(mainPath));
@@ -187,6 +191,96 @@ async function run() {
   assert.strictEqual(plugin._parseStructured(broken, 'list').headings.length, 0);
   assert.strictEqual(plugin._resolveStructure(brokenFrontmatter, broken), 'heading');
   assert.strictEqual(plugin._parseStructured(broken, plugin._resolveStructure(brokenFrontmatter, broken)).headings.length, 2);
+
+  const oddParsed = plugin._parseStructured('## Details\n### Child\n# Title\n', 'heading');
+  const oddTree = plugin._buildTree(oddParsed, 'F');
+  assert.ok(oddTree.virtualRoot, 'out-of-order top levels must use a virtual root');
+  assert.deepStrictEqual(oddTree.tree.children.map((node) => node.text), ['Details', 'Title']);
+  assert.deepStrictEqual(oddTree.tree.children[0].children.map((node) => node.text), ['Child']);
+  assert.strictEqual(
+    plugin._serialize(oddParsed, oddTree, 'heading'),
+    '# Details\n## Child\n# Title\n',
+    'out-of-order headings should preserve hierarchy while normalizing levels'
+  );
+
+  assert.strictEqual(plugin._safeExternalHref('https://example.com'), 'https://example.com');
+  assert.strictEqual(plugin._safeExternalHref(' HTTPS://example.com/path '), 'HTTPS://example.com/path');
+  assert.strictEqual(plugin._safeExternalHref('obsidian://open?vault=Test'), 'obsidian://open?vault=Test');
+  assert.strictEqual(plugin._safeExternalHref('javascript:alert(1)'), null);
+  assert.strictEqual(plugin._safeExternalHref('data:text/html,unsafe'), null);
+  assert.strictEqual(plugin._safeExternalHref('Notes/Target.md'), null);
+
+  const measuredChild = {
+    _el: { getBoundingClientRect: () => ({ width: 120, height: 60 }) },
+    children: [],
+    collapsed: false,
+  };
+  const measuredRoot = {
+    _el: { getBoundingClientRect: () => ({ width: 200, height: 80 }) },
+    children: [measuredChild],
+    collapsed: false,
+  };
+  plugin._measureNodes(measuredRoot, 2);
+  assert.deepStrictEqual([measuredRoot.width, measuredRoot.height], [100, 40]);
+  assert.deepStrictEqual([measuredChild.width, measuredChild.height], [60, 30]);
+
+  const zoomInner = { style: {} };
+  const zoomCanvas = { _stratify: { tx: 100, ty: 70, scale: 3 }, clientWidth: 400, clientHeight: 300 };
+  plugin._zoomBy(zoomCanvas, zoomInner, 1.2);
+  assert.deepStrictEqual(zoomCanvas._stratify, { tx: 100, ty: 70, scale: 3 });
+  zoomCanvas._stratify = { tx: -20, ty: -10, scale: 0.2 };
+  plugin._zoomBy(zoomCanvas, zoomInner, 1 / 1.2);
+  assert.deepStrictEqual(zoomCanvas._stratify, { tx: -20, ty: -10, scale: 0.2 });
+  zoomCanvas._stratify = { tx: 0, ty: 0, scale: 1 };
+  plugin._zoomBy(zoomCanvas, zoomInner, 2);
+  assert.deepStrictEqual(zoomCanvas._stratify, { tx: -200, ty: -150, scale: 2 });
+
+  assert.deepStrictEqual(plugin._hexToRgb('rgb(255, 255, 255)'), [255, 255, 255]);
+  assert.deepStrictEqual(plugin._hexToRgb('rgba(12, 34, 56, 0.5)'), [12, 34, 56]);
+  assert.deepStrictEqual(plugin._hexToRgb('#abc'), [170, 187, 204]);
+  assert.strictEqual(plugin._mixColors('#FF0000', 'rgb(255,255,255)', 0.5), 'rgb(255,128,128)');
+
+  const getLeavesOfType = plugin.app.workspace.getLeavesOfType;
+  let unloadedScanCount = 0;
+  plugin.app.workspace.getLeavesOfType = () => {
+    unloadedScanCount += 1;
+    return [];
+  };
+  plugin._unloading = true;
+  await plugin._doScan();
+  assert.strictEqual(unloadedScanCount, 0, 'an unloaded plugin must not start another scan');
+  plugin._unloading = false;
+  plugin.app.workspace.getLeavesOfType = getLeavesOfType;
+
+  const cachedRead = plugin.app.vault.cachedRead;
+  let resolveDelayedRead;
+  let overlayCreateCount = 0;
+  const delayedView = Object.assign(new MockMarkdownView(), {
+    file,
+    editor: null,
+    contentEl: {
+      addClass: () => {},
+      querySelector: () => null,
+      createDiv: () => {
+        overlayCreateCount += 1;
+        return {};
+      },
+    },
+  });
+  plugin.app.workspace.getLeavesOfType = () => [{ view: delayedView }];
+  plugin.app.vault.cachedRead = () => new Promise((resolve) => {
+    resolveDelayedRead = resolve;
+  });
+  const delayedScan = plugin._doScan();
+  await Promise.resolve();
+  assert.ok(resolveDelayedRead, 'the delayed scan should reach the asynchronous file read');
+  plugin._unloading = true;
+  resolveDelayedRead(editorValue);
+  await delayedScan;
+  assert.strictEqual(overlayCreateCount, 0, 'an in-flight scan must not recreate an overlay after unload');
+  plugin._unloading = false;
+  plugin.app.workspace.getLeavesOfType = getLeavesOfType;
+  plugin.app.vault.cachedRead = cachedRead;
 
   console.log('Tab display, persistence, reopen, atomic mode, and mismatch recovery tests passed');
 }

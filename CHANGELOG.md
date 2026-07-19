@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.5
+
+- Fixed layout measurements after zooming and stopped wheel or button zoom from drifting at scale limits.
+- Preserved the correct hierarchy for out-of-order headings and restricted rendered external links to safe protocols.
+- Normalized CSS theme colors before PNG mixing so exports no longer darken unexpectedly.
+- Cancelled pending scans, guarded in-flight unload work, and broke stale render cleanup chains.
+- Added regression coverage for hierarchy, link protocols, zoom geometry, CSS colors, and unload races.
+
 ## 1.1.4
 
 - Fixed newly added nodes and edited root labels reverting before Obsidian saved the active editor to disk.
