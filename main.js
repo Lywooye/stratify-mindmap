@@ -2,62 +2,71 @@
 
 const obsidian = require('obsidian');
 
+// Categorical branch palettes adapted from Paul Tol, Tableau, and ColorBrewer.
 const THEMES = {
   minimal: {
-    name: 'Minimal',
-    palette: ['#4F6B7A', '#3F7668', '#765B78', '#8A6A3F', '#526B8A', '#7A5A52', '#5F7351', '#536D78'],
-    rootFill: '#405866',
+    name: 'Obsidian Neutral',
+    description: 'Muted branches on the current Obsidian background.',
+    palette: ['#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77', '#CC6677', '#882255', '#AA4499'],
+    rootFill: '#3F5360',
     bg: null, fg: null,
-    rootAccent: '#405866'
+    rootAccent: '#526D7A'
   },
   vibrant: {
-    name: 'Vibrant',
-    palette: ['#F87171', '#FB923C', '#FBBF24', '#A3E635', '#34D399', '#22D3EE', '#60A5FA', '#A78BFA', '#F472B6', '#F43F5E', '#10B981', '#0EA5E9'],
-    rootFill: '#6D5BA7',
-    bg: '#FFFFFF', fg: '#1F2937',
-    rootAccent: '#8B5CF6'
+    name: 'Tol Vibrant',
+    description: 'High-contrast, color-blind-safe categorical colors.',
+    palette: ['#0077BB', '#33BBEE', '#009988', '#EE7733', '#CC3311', '#EE3377', '#BBBBBB'],
+    rootFill: '#005A8D',
+    bg: '#FFFFFF', fg: '#20242A',
+    rootAccent: '#0077BB'
   },
   classic: {
-    name: 'Classic',
-    palette: ['#19807E', '#383B70', '#A05A2C', '#7B9BC6', '#C47A82', '#3A8A8C', '#B85C5C', '#5D6D7E', '#8B7355', '#4A6B8A', '#9C6B4F', '#6B7A8F'],
-    rootFill: '#B98218',
-    bg: '#FFFEF6', fg: '#1F2937',
-    rootAccent: '#FFB800'
+    name: 'Tableau Classic',
+    description: 'The familiar Tableau Classic 10 categorical palette.',
+    palette: ['#1F77B4', '#FF7F0E', '#2CA02C', '#D62728', '#9467BD', '#8C564B', '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF'],
+    rootFill: '#355C7D',
+    bg: '#FFFFFF', fg: '#20242A',
+    rootAccent: '#1F77B4'
   },
   fresh: {
-    name: 'Fresh',
-    palette: ['#10B981', '#22D3EE', '#84CC16', '#14B8A6', '#06B6D4', '#34D399', '#A3E635', '#0EA5E9', '#65A30D', '#0891B2', '#16A34A', '#0D9488'],
-    rootFill: '#188A78',
-    bg: '#F0FDF4', fg: '#0F172A',
-    rootAccent: '#10B981'
+    name: 'Tol Light',
+    description: 'Soft, readable colors for larger filled areas.',
+    palette: ['#77AADD', '#99DDFF', '#44BB99', '#BBCC33', '#AAAA00', '#EEDD88', '#EE8866', '#FFAABB'],
+    rootFill: '#276C60',
+    bg: '#FAFCFB', fg: '#172521',
+    rootAccent: '#2A7A68'
   },
   ocean: {
-    name: 'Ocean',
-    palette: ['#0EA5E9', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#0891B2', '#0284C7', '#2563EB', '#4F46E5', '#7C3AED', '#0E7490', '#1E40AF'],
-    rootFill: '#3267A8',
-    bg: '#EFF6FF', fg: '#0F172A',
-    rootAccent: '#2563EB'
+    name: 'ColorBrewer Paired',
+    description: 'Paired light and dark hues for related branches.',
+    palette: ['#1F78B4', '#A6CEE3', '#33A02C', '#B2DF8A', '#E31A1C', '#FB9A99', '#FF7F00', '#FDBF6F', '#6A3D9A', '#CAB2D6'],
+    rootFill: '#3F5D7D',
+    bg: '#FAFCFF', fg: '#17202A',
+    rootAccent: '#1F78B4'
   },
   sunset: {
-    name: 'Sunset',
-    palette: ['#F43F5E', '#F97316', '#FBBF24', '#EF4444', '#EC4899', '#FB923C', '#F59E0B', '#DC2626', '#DB2777', '#EA580C', '#D97706', '#BE185D'],
-    rootFill: '#B85255',
-    bg: '#FFF7ED', fg: '#1F2937',
-    rootAccent: '#F43F5E'
+    name: 'Tol Medium Contrast',
+    description: 'Print-friendly warm and cool contrast pairs.',
+    palette: ['#EECC66', '#EE99AA', '#6699CC', '#997700', '#994455', '#004488'],
+    rootFill: '#6B3F56',
+    bg: '#FFFCF8', fg: '#2C2024',
+    rootAccent: '#994455'
   },
   midnight: {
-    name: 'Midnight',
-    palette: ['#22D3EE', '#A78BFA', '#F472B6', '#34D399', '#FBBF24', '#60A5FA', '#FB923C', '#F87171', '#10B981', '#A3E635', '#8B5CF6', '#0EA5E9'],
-    rootFill: '#3B607A',
-    bg: '#202531', fg: '#E2E8F0',
-    rootAccent: '#1799F3'
+    name: 'Midnight Bright',
+    description: 'Color-blind-safe bright branches on a dark canvas.',
+    palette: ['#66CCEE', '#228833', '#CCBB44', '#EE6677', '#AA3377', '#4477AA', '#BBBBBB'],
+    rootFill: '#315A7D',
+    bg: '#151922', fg: '#E9EEF5',
+    rootAccent: '#66CCEE'
   },
   slate: {
-    name: 'Slate',
-    palette: ['#38BDF8', '#818CF8', '#22D3EE', '#2DD4BF', '#A78BFA', '#34D399', '#67E8F9', '#C084FC', '#5EEAD4', '#7DD3FC', '#93C5FD', '#6EE7B7'],
-    rootFill: '#4C5F78',
-    bg: '#2C3341', fg: '#CBD5E1',
-    rootAccent: '#6366F1'
+    name: 'Nordic Dark',
+    description: 'A restrained dark palette with cool and warm accents.',
+    palette: ['#88C0D0', '#81A1C1', '#5E81AC', '#A3BE8C', '#EBCB8B', '#D08770', '#BF616A', '#B48EAD'],
+    rootFill: '#46566D',
+    bg: '#252A33', fg: '#E1E6EC',
+    rootAccent: '#88C0D0'
   }
 };
 
@@ -99,14 +108,17 @@ const DEFAULT_PLUGIN_SETTINGS = {
   defaultTheme: DEFAULT_THEME,
   defaultLine: DEFAULT_LINE,
   defaultNodeStyle: DEFAULT_NODE_STYLE,
+  nodeFontSize: 13,
   keyboardNavigation: true,
   leafOutsideDropCreatesChild: true,
 };
 
-const HGAP = 64;
-const VGAP = 18;
-const ROOT_HGAP = 90;
-const PAD = 60;
+const MIN_NODE_FONT_SIZE = 11;
+const MAX_NODE_FONT_SIZE = 18;
+const HGAP = 48;
+const VGAP = 10;
+const ROOT_HGAP = 68;
+const PAD = 40;
 const PLACEHOLDER = 'New Title';
 
 class StratifyMindmapPlugin extends obsidian.Plugin {
@@ -219,6 +231,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     this.settings.defaultTheme = THEMES[this.settings.defaultTheme] ? this.settings.defaultTheme : DEFAULT_THEME;
     this.settings.defaultLine = LINE_STYLES[this.settings.defaultLine] ? this.settings.defaultLine : DEFAULT_LINE;
     this.settings.defaultNodeStyle = NODE_STYLES[this.settings.defaultNodeStyle] ? this.settings.defaultNodeStyle : DEFAULT_NODE_STYLE;
+    const fontSize = Number(this.settings.nodeFontSize);
+    this.settings.nodeFontSize = Number.isFinite(fontSize)
+      ? Math.min(MAX_NODE_FONT_SIZE, Math.max(MIN_NODE_FONT_SIZE, Math.round(fontSize)))
+      : DEFAULT_PLUGIN_SETTINGS.nodeFontSize;
     this.settings.keyboardNavigation = this.settings.keyboardNavigation !== false;
     this.settings.leafOutsideDropCreatesChild = this.settings.leafOutsideDropCreatesChild !== false;
   }
@@ -256,6 +272,41 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   _defaultNodeStyle() {
     const key = this._getSetting('defaultNodeStyle');
     return NODE_STYLES[key] ? key : DEFAULT_NODE_STYLE;
+  }
+
+  _baseNodeFontSize() {
+    const value = Number(this._getSetting('nodeFontSize'));
+    return Number.isFinite(value)
+      ? Math.min(MAX_NODE_FONT_SIZE, Math.max(MIN_NODE_FONT_SIZE, value))
+      : DEFAULT_PLUGIN_SETTINGS.nodeFontSize;
+  }
+
+  _fontSizeForNode(depth, nodeStyle) {
+    const base = this._baseNodeFontSize();
+    if (nodeStyle === 'borderless') {
+      if (depth === 0) return base + 6;
+      if (depth === 1) return base + 2;
+    } else if (nodeStyle === 'doodle' && depth === 0) {
+      return base + 4;
+    }
+    if (depth === 0) return base + 3;
+    if (depth === 1) return base + 1;
+    if (depth === 2) return base + 0.5;
+    return Math.max(MIN_NODE_FONT_SIZE, base - 0.5);
+  }
+
+  _applyDisplaySettingsToOverlay(overlay) {
+    if (!overlay) return;
+    overlay.style.setProperty('--stratify-font-size', this._baseNodeFontSize() + 'px');
+  }
+
+  _refreshDisplaySettings() {
+    document.querySelectorAll('.stratify-overlay').forEach((overlay) => {
+      this._applyDisplaySettingsToOverlay(overlay);
+      if (overlay._stratifyTreeInfo && overlay._stratifyCanvas) {
+        this._renderTreeIntoCanvas(overlay, true);
+      }
+    });
   }
 
   _newMindmapContent() {
@@ -582,15 +633,22 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         listStack.push({ indent, level });
       }
     }
-    const preBody = headings.length > 0
-      ? lines.slice(0, headings[0].srcIdx).join('\n')
-      : lines.join('\n');
+    const preEnd = headings.length > 0 ? headings[0].srcIdx : lines.length;
+    let preBody = lines.slice(0, preEnd).join('\n');
+    if (headings.length > 0 && preEnd > 0) preBody += '\n';
     for (let i = 0; i < headings.length; i++) {
       const start = headings[i].srcIdx + 1;
       const end = i + 1 < headings.length ? headings[i + 1].srcIdx : lines.length;
       headings[i].bodyRaw = lines.slice(start, end).join('\n');
+      if (i + 1 < headings.length && end > start) headings[i].bodyRaw += '\n';
     }
     return { frontmatterRaw, preBody, headings, structureMode: mode };
+  }
+
+  _hasSourceOnlyContent(parsed) {
+    if (!parsed) return false;
+    if (parsed.preBody && parsed.preBody.trim()) return true;
+    return parsed.headings.some((node) => node.bodyRaw && node.bodyRaw.trim());
   }
 
   _buildTree(parsed, fileName) {
@@ -860,6 +918,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const fmThemeValid = fmTheme && THEMES[String(fmTheme).toLowerCase()];
     const themeId = overlay._stratifyTheme && THEMES[overlay._stratifyTheme] ? overlay._stratifyTheme : this._resolveTheme(frontmatter);
     this._applyThemeToOverlay(overlay, themeId);
+    this._applyDisplaySettingsToOverlay(overlay);
 
     const fmLine = frontmatter && (frontmatter['mindmap-line'] || frontmatter['mindmap_line']);
     const fmLineValid = fmLine && LINE_STYLES[String(fmLine).toLowerCase()];
@@ -983,10 +1042,21 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const zoomInBtn = makeIconButton(actions, 'plus', 'Zoom in');
     const zoomOutBtn = makeIconButton(actions, 'minus', 'Zoom out');
     const editBtn = makeIconButton(actions, 'file-pen-line', 'Edit Markdown source');
-    editBtn.onclick = () => {
+    const showSource = () => {
       overlay.classList.add('stratify-hidden');
       this._showRestoreFab(view, overlay);
     };
+    editBtn.onclick = showSource;
+
+    if (this._hasSourceOnlyContent(parsed)) {
+      const sourceOnlyBtn = makeIconButton(
+        actions,
+        'file-text',
+        'Markdown-only content is preserved in the source',
+        'stratify-source-only'
+      );
+      sourceOnlyBtn.onclick = showSource;
+    }
 
     const more = toolbar.createEl('details', { cls: 'stratify-more' });
     const moreToggle = more.createEl('summary', {
@@ -996,20 +1066,47 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     obsidian.setIcon(moreToggle, 'sliders-horizontal');
     const morePanel = more.createDiv({ cls: 'stratify-more-panel' });
 
-    const themeGroup = morePanel.createDiv({ cls: 'stratify-toolbar-group stratify-toolbar-field' });
-    themeGroup.createSpan({ cls: 'stratify-toolbar-label', text: 'Theme' });
-    const themeSelect = themeGroup.createEl('select', { cls: 'stratify-select' });
-    for (const id of Object.keys(THEMES)) {
-      const opt = themeSelect.createEl('option', { value: id, text: THEMES[id].name });
-      if (id === overlay._stratifyTheme) opt.selected = true;
-    }
-    themeSelect.onchange = () => {
-      const id = themeSelect.value;
-      if (!THEMES[id] || id === overlay._stratifyTheme) return;
-      this._applyThemeToOverlay(overlay, id);
-      if (overlay._stratifyTreeInfo) this._renderTreeIntoCanvas(overlay, true);
-      this._persistFrontmatterValue(file, 'mindmap-theme', id);
+    const themeGroup = morePanel.createDiv({ cls: 'stratify-theme-field' });
+    themeGroup.createSpan({ cls: 'stratify-toolbar-label', text: 'Theme palette' });
+    const themePicker = themeGroup.createDiv({
+      cls: 'stratify-theme-picker',
+      attr: { role: 'radiogroup', 'aria-label': 'Theme palette' }
+    });
+    const themeButtons = new Map();
+    const syncThemeButtons = () => {
+      for (const [id, button] of themeButtons) {
+        const selected = id === overlay._stratifyTheme;
+        button.classList.toggle('stratify-theme-option-active', selected);
+        button.setAttribute('aria-checked', String(selected));
+      }
     };
+    for (const id of Object.keys(THEMES)) {
+      const theme = THEMES[id];
+      const button = themePicker.createEl('button', {
+        cls: 'stratify-theme-option',
+        attr: {
+          type: 'button',
+          role: 'radio',
+          'aria-checked': String(id === overlay._stratifyTheme),
+          title: theme.description || theme.name
+        }
+      });
+      button.createSpan({ cls: 'stratify-theme-option-name', text: theme.name });
+      const swatches = button.createSpan({ cls: 'stratify-theme-swatches', attr: { 'aria-hidden': 'true' } });
+      [theme.rootFill].concat(theme.palette.slice(0, 6)).forEach((color) => {
+        const swatch = swatches.createSpan({ cls: 'stratify-theme-swatch' });
+        swatch.style.backgroundColor = color;
+      });
+      button.onclick = () => {
+        if (id === overlay._stratifyTheme) return;
+        this._applyThemeToOverlay(overlay, id);
+        syncThemeButtons();
+        if (overlay._stratifyTreeInfo) this._renderTreeIntoCanvas(overlay, true);
+        this._persistFrontmatterValue(file, 'mindmap-theme', id);
+      };
+      themeButtons.set(id, button);
+    }
+    syncThemeButtons();
 
     const lineGroup = morePanel.createDiv({ cls: 'stratify-toolbar-group stratify-toolbar-field' });
     lineGroup.createSpan({ cls: 'stratify-toolbar-label', text: 'Line' });
@@ -1054,7 +1151,9 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       const emptyIcon = empty.createDiv({ cls: 'stratify-empty-icon' });
       obsidian.setIcon(emptyIcon, 'network');
       const msg = empty.createDiv();
-      if (structureId === 'list') {
+      if (this._hasSourceOnlyContent(parsed)) {
+        msg.setText('No supported mindmap nodes were found. Markdown-only content remains preserved in the source.');
+      } else if (structureId === 'list') {
         msg.appendText('Add nested list items (e.g. ');
         msg.createEl('code', { text: '- Root' });
         msg.appendText(', ');
@@ -1153,12 +1252,18 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
   _createNodes(node, layer, overlay) {
     const el = layer.createDiv({ cls: 'stratify-node stratify-node-d' + node.depth });
+    const titleParts = [];
     if (node.depth === 0) el.classList.add('stratify-node-root');
     if (node.isVirtual) el.classList.add('stratify-node-virtual');
+    if (node.bodyRaw && node.bodyRaw.trim()) {
+      el.classList.add('stratify-node-source-note');
+      titleParts.push('Contains Markdown-only content preserved with this node');
+    }
     if (node.collapsed && node.children.length) {
       el.classList.add('stratify-collapsed');
-      el.title = node.children.length + ' hidden — Space to expand';
+      titleParts.push(node.children.length + ' hidden — Space to expand');
     }
+    if (titleParts.length) el.title = titleParts.join('\n');
     el.style.setProperty('--stratify-color', node.color);
     el.tabIndex = 0;
     if (node.collapsed && node.children.length) {
@@ -2868,7 +2973,6 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
-    let displayText = text;
     const ls = letterSpacing || 0;
 
     // Measure with letter-spacing (CSS letter-spacing applies after each char)
@@ -2878,27 +2982,49 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       return w;
     };
 
-    let tw = measureWithLS(displayText);
-    if (tw > maxW) {
-      while (displayText.length > 0 && measureWithLS(displayText + '...') > maxW) {
-        displayText = displayText.slice(0, -1);
+    const lines = [];
+    const paragraphs = String(text || '').split('\n');
+    for (const paragraph of paragraphs) {
+      if (!paragraph) {
+        lines.push('');
+        continue;
       }
-      displayText += '...';
+      let current = '';
+      for (const ch of Array.from(paragraph)) {
+        const trial = current + ch;
+        if (current && measureWithLS(trial) > maxW) {
+          const breakAt = current.lastIndexOf(' ');
+          if (breakAt > 0) {
+            lines.push(current.slice(0, breakAt));
+            current = (current.slice(breakAt + 1) + ch).trimStart();
+          } else {
+            lines.push(current);
+            current = ch;
+          }
+        } else {
+          current = trial;
+        }
+      }
+      if (current || lines.length === 0) lines.push(current);
     }
 
+    const fontMatch = font.match(/([0-9.]+)px/);
+    const fontSize = fontMatch ? Number(fontMatch[1]) : 13;
+    const lineHeight = fontSize * 1.35;
+    const firstY = y - ((lines.length - 1) * lineHeight) / 2;
     const alignType = align || 'left';
-    let drawX = x;
-    if (alignType === 'center') {
-      drawX = x - measureWithLS(displayText) / 2;
-    } else if (alignType === 'right') {
-      drawX = x - measureWithLS(displayText);
-    }
-
-    for (let i = 0; i < displayText.length; i++) {
-      const ch = displayText[i];
-      ctx.fillText(ch, drawX, y);
-      drawX += ctx.measureText(ch).width + ls;
-    }
+    lines.forEach((line, lineIndex) => {
+      let drawX = x;
+      if (alignType === 'center') {
+        drawX = x - measureWithLS(line) / 2;
+      } else if (alignType === 'right') {
+        drawX = x - measureWithLS(line);
+      }
+      for (const ch of Array.from(line)) {
+        ctx.fillText(ch, drawX, firstY + lineIndex * lineHeight);
+        drawX += ctx.measureText(ch).width + ls;
+      }
+    });
     ctx.restore();
   }
 
@@ -2998,10 +3124,29 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     }
 
     const fontBase = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+    const fontSize = this._fontSizeForNode(depth, nodeStyle) * scale;
+    const textPad = depth === 0
+      ? (isBorderless ? 4 : isDoodle ? 18 : 14)
+      : depth === 1
+        ? (isBorderless ? 4 : isDoodle ? 13 : 10)
+        : depth === 2
+          ? (isBorderless || isDoodle ? 12 : 10)
+          : 10;
+    const drawNodeText = (weight, color) => this._drawTextToCanvas(
+      ctx,
+      node.text,
+      x + textPad * scale,
+      y + h / 2,
+      w - textPad * 2 * scale - badgeExtra,
+      `${weight} ${fontSize}px ${fontBase}`,
+      color,
+      'left',
+      0
+    );
     if (depth === 0) {
       if (isBorderless) {
         const rootColor = theme.rootAccent || '#405866';
-        this._drawTextToCanvas(ctx, node.text, x + 16 * scale, y + h / 2, w - 32 * scale - badgeExtra, `700 ${16 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : rootColor, 'left', 0);
+        drawNodeText(700, isDark ? '#E2E8F0' : rootColor);
       } else {
         // Root node: solid accent background
         ctx.shadowColor = 'rgba(0,0,0,0.15)';
@@ -3013,15 +3158,15 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         } else {
           this._roundRect(ctx, x, y, w, h, r);
         }
-        ctx.fillStyle = theme.rootAccent || '#405866';
+        ctx.fillStyle = theme.rootFill || theme.rootAccent || '#405866';
         ctx.fill();
 
         ctx.shadowColor = 'transparent';
-        this._drawTextToCanvas(ctx, node.text, x + 16 * scale, y + h / 2, w - 32 * scale - badgeExtra, `700 ${16 * scale}px ${fontBase}`, '#FFFFFF', 'left', 0);
+        drawNodeText(700, '#FFFFFF');
       }
     } else if (depth === 1) {
       if (isBorderless) {
-        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `600 ${14 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : node.color);
+        drawNodeText(600, isDark ? '#E2E8F0' : node.color);
       } else {
         if (isDoodle) {
           this._drawDoodleRect(ctx, x, y, w, h, seed);
@@ -3034,11 +3179,11 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         ctx.strokeStyle = node.color;
         ctx.lineWidth = 1 * scale;
         ctx.stroke();
-        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `600 ${14 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
+        drawNodeText(600, isDark ? '#E2E8F0' : '#1F2937');
       }
     } else if (depth === 2) {
       if (isBorderless) {
-        this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `600 ${13.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
+        drawNodeText(600, isDark ? '#E2E8F0' : '#1F2937');
       } else {
         // Level 2: tinted background with colored border
         if (isDoodle) {
@@ -3053,11 +3198,11 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         ctx.lineWidth = 1 * scale;
         ctx.stroke();
 
-        this._drawTextToCanvas(ctx, node.text, x + 14 * scale, y + h / 2, w - 28 * scale - badgeExtra, `600 ${13.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
+        drawNodeText(600, isDark ? '#E2E8F0' : '#1F2937');
       }
     } else {
       if (isBorderless) {
-        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `500 ${12.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
+        drawNodeText(500, isDark ? '#E2E8F0' : '#1F2937');
       } else {
         // Level 3+: subtle border
         if (isDoodle) {
@@ -3072,14 +3217,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         ctx.lineWidth = 1 * scale;
         ctx.stroke();
 
-        this._drawTextToCanvas(ctx, node.text, x + 12 * scale, y + h / 2, w - 24 * scale - badgeExtra, `500 ${12.5 * scale}px ${fontBase}`, isDark ? '#E2E8F0' : '#1F2937');
+        drawNodeText(500, isDark ? '#E2E8F0' : '#1F2937');
       }
     }
 
     // Draw collapse badge
     if (collapsed) {
       const badgeR = 8 * scale;
-      const padRight = depth === 0 ? 16 : depth === 1 ? 12 : 11;
+      const padRight = textPad;
       const badgeCX = x + w - padRight * scale - badgeR;
       const badgeCY = y + h / 2;
 
@@ -3340,12 +3485,7 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
       }
     );
 
-    this.addDropdownSetting(
-      'Default theme',
-      'Initial color theme for new or unconfigured mindmaps.',
-      'defaultTheme',
-      THEMES
-    );
+    this.addThemeSetting();
 
     this.addDropdownSetting(
       'Default line style',
@@ -3360,6 +3500,23 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
       'defaultNodeStyle',
       NODE_STYLES
     );
+
+    containerEl.createEl('h3', { text: 'Display' });
+
+    new obsidian.Setting(containerEl)
+      .setName('Node font size')
+      .setDesc('Base font size for all mindmaps. Root and first-level nodes remain proportionally larger.')
+      .addSlider((slider) => {
+        slider
+          .setLimits(MIN_NODE_FONT_SIZE, MAX_NODE_FONT_SIZE, 1)
+          .setValue(this.plugin.settings.nodeFontSize)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.nodeFontSize = value;
+            await this.plugin.saveSettings();
+            this.plugin._refreshDisplaySettings();
+          });
+      });
 
     containerEl.createEl('h3', { text: 'Interaction' });
 
@@ -3396,9 +3553,38 @@ class StratifyMindmapSettingTab extends obsidian.PluginSettingTab {
           .onClick(async () => {
             this.plugin.settings = Object.assign({}, DEFAULT_PLUGIN_SETTINGS);
             await this.plugin.saveSettings();
+            this.plugin._refreshDisplaySettings();
             this.display();
           });
       });
+  }
+
+  addThemeSetting() {
+    const setting = new obsidian.Setting(this.containerEl)
+      .setName('Default theme')
+      .setDesc('Initial color theme for new or unconfigured mindmaps.');
+    const preview = setting.descEl.createDiv({ cls: 'stratify-setting-theme-preview' });
+    const renderPreview = (id) => {
+      const theme = THEMES[id] || THEMES[DEFAULT_THEME];
+      preview.empty();
+      preview.createSpan({ cls: 'stratify-setting-theme-description', text: theme.description || theme.name });
+      const swatches = preview.createSpan({ cls: 'stratify-theme-swatches', attr: { 'aria-hidden': 'true' } });
+      [theme.rootFill].concat(theme.palette.slice(0, 6)).forEach((color) => {
+        const swatch = swatches.createSpan({ cls: 'stratify-theme-swatch' });
+        swatch.style.backgroundColor = color;
+      });
+    };
+    setting.addDropdown((dropdown) => {
+      for (const id of Object.keys(THEMES)) dropdown.addOption(id, THEMES[id].name);
+      dropdown
+        .setValue(this.plugin.settings.defaultTheme)
+        .onChange(async (value) => {
+          this.plugin.settings.defaultTheme = value;
+          await this.plugin.saveSettings();
+          renderPreview(value);
+        });
+    });
+    renderPreview(this.plugin.settings.defaultTheme);
   }
 
   addDropdownSetting(name, desc, key, options) {

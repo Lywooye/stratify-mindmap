@@ -16,7 +16,10 @@ The interface is deliberately compact: structure and layout stay in the main too
 - Arrow-key selection and keyboard restructuring
 - Undo and redo for map operations
 - Obsidian wikilinks, node collapse, multiple layouts, and PNG export
-- Flat Minimal theme that follows Obsidian light and dark appearance
+- Visual theme picker with curated categorical color palettes
+- Configurable node font size and matching PNG export text
+- Automatic wrapping for long labels and a more compact layout
+- Source-only Markdown preservation indicators
 - Desktop and mobile support
 
 ## Interface Preview
@@ -66,6 +69,14 @@ mindmap-node: rounded
     - Detailed notes
 ```
 
+## Markdown-only Content
+
+Headings and list items become mind map nodes. Other Markdown, including ordinary paragraphs, blockquotes, code blocks, tables, and comments, remains in the source instead of being silently converted into nodes or comments.
+
+Content before the first node is preserved as document-level source. Content after a node stays attached to that node. An orange marker on a node and the file-text icon in the toolbar indicate that source-only Markdown is present; selecting the toolbar icon opens the Markdown source.
+
+Normal rendering, node editing, and structure-mode conversion preserve this content. Moving a node also moves its attached source block. Deleting that node deletes the attached block as part of the same undoable operation. A document containing only source-only content renders an empty-map state while leaving the Markdown unchanged.
+
 ## Editing
 
 | Action | Gesture or shortcut |
@@ -86,9 +97,9 @@ Dragging onto the upper or lower part of a node inserts before or after it. Drop
 
 ## Toolbar and Settings
 
-The main toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. Theme, connector style, node shape, and PNG export are grouped under the appearance menu.
+The main toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. The appearance menu shows every theme as a named row of color swatches, followed by connector style, node shape, and PNG export.
 
-The Obsidian settings page controls defaults for new or unconfigured maps, keyboard navigation, and leaf-node drop behavior. Existing frontmatter is not overwritten by changing defaults.
+The Obsidian settings page controls defaults for new or unconfigured maps, the global node font size, keyboard navigation, and leaf-node drop behavior. Existing frontmatter is not overwritten by changing defaults.
 
 ## Create or Convert a Mind Map
 
@@ -122,3 +133,5 @@ Existing notes remain compatible because Stratify keeps `type: mindmap` and the 
 ## Credits and License
 
 Stratify Mindmap is an independent derivative of [Light Mindmap](https://github.com/ninglg/light-mindmap) by Light Ning. It retains the original copyright notice and is distributed under the MIT License.
+
+The built-in categorical palettes reference [Paul Tol's color schemes](https://sronpersonalpages.nl/~pault/), [Tableau Classic palettes](https://help.tableau.com/current/pro/desktop/en-us/formatting_create_custom_colors.htm), and [ColorBrewer](https://colorbrewer2.org/).
