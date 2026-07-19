@@ -340,6 +340,13 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     return this.app.vault.read(file);
   }
 
+  async _writeMindmapContent(overlay, content) {
+    const file = overlay && overlay._stratifyFile;
+    if (!file) return;
+    await this.app.vault.modify(file, content);
+    overlay._stratifyLastContent = content;
+  }
+
   async _convertFileToMindmap(file, openAfter) {
     if (!(file instanceof obsidian.TFile) || file.extension !== 'md') return;
     try {
@@ -449,6 +456,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     let parsed = null;
     try { parsed = obsidian.parseYaml(m[1]) || {}; } catch (e) {}
     return { frontmatterRaw: m[0], frontmatter: parsed, body: content.slice(m[0].length) };
+  }
+
+  _withFrontmatterUpdates(content, updates) {
+    const split = this._splitFrontmatter(content || '');
+    const frontmatter = Object.assign({}, split.frontmatter || {}, updates || {});
+    const yaml = obsidian.stringifyYaml(frontmatter).trimEnd();
+    const bodyPrefix = split.frontmatterRaw ? '' : '\n';
+    return '---\n' + yaml + '\n---\n' + bodyPrefix + split.body;
   }
 
   _stripInline(text) {
@@ -725,6 +740,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     return out;
   }
 
+  _serializeMindmap(parsed, treeInfo, structureMode) {
+    const mode = this._normalizeStructureMode(structureMode) || parsed.structureMode || this._defaultStructure();
+    const content = this._serialize(parsed, treeInfo, mode);
+    const frontmatter = this._splitFrontmatter(content).frontmatter;
+    if (this._readStructureFromFrontmatter(frontmatter) === mode) return content;
+    return this._withFrontmatterUpdates(content, { 'mindmap-structure': mode });
+  }
+
   _maxSerializedLevel(treeInfo) {
     if (!treeInfo || !treeInfo.tree) return 0;
     const walk = (node, level) => {
@@ -855,7 +878,15 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   }
 
   _resolveStructure(frontmatter, content) {
-    return this._readStructureFromFrontmatter(frontmatter) || this._detectStructureMode(content);
+    const declared = this._readStructureFromFrontmatter(frontmatter);
+    if (!declared) return this._detectStructureMode(content);
+    if (this._parseStructured(content, declared).headings.length > 0) return declared;
+
+    const detected = this._detectStructureMode(content);
+    if (detected !== declared && this._parseStructured(content, detected).headings.length > 0) {
+      return detected;
+    }
+    return declared;
   }
 
   _applyNodeStyleToOverlay(overlay, nodeStyleId) {
@@ -992,8 +1023,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       }
       this._pushUndoSnapshot(overlay);
       overlay._stratifyStructure = id;
-      const newContent = this._serialize(overlay._stratifyParsed, overlay._stratifyTreeInfo, id);
-      const nextFrontmatter = Object.assign({}, overlay._stratifyFrontmatter || {}, { 'mindmap-structure': id });
+      const newContent = this._serializeMindmap(overlay._stratifyParsed, overlay._stratifyTreeInfo, id);
+      const nextFrontmatter = this._splitFrontmatter(newContent).frontmatter || {};
       overlay._stratifyLastContent = newContent;
       overlay._stratifyParsed = this._parseStructured(newContent, id);
       overlay._stratifyTreeInfo = this._buildTree(overlay._stratifyParsed, fileBasename);
@@ -1004,10 +1035,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (!file) return;
       try {
         overlay._stratifyWriting = true;
-        await this.app.vault.modify(file, newContent);
-        await this._persistFrontmatterValue(file, 'mindmap-structure', id);
-        const latest = await this._readFileContent(file);
-        this._render(overlay, latest, nextFrontmatter, fileBasename, view, file);
+        await this._writeMindmapContent(overlay, newContent);
+        this._render(overlay, newContent, nextFrontmatter, fileBasename, view, file);
       } catch (e) {
         console.error('[StratifyMindmap] structure mode persist error', e);
         new obsidian.Notice('Failed to change mindmap mode: ' + e.message);
@@ -1320,8 +1349,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
           e.preventDefault();
           const text = el.textContent;
-          this._exitEditMode(overlay, node);
           this._updateNodeText(node, text);
+          this._exitEditMode(overlay, node);
           if (node.dirty) {
             this._pushUndoSnapshot(overlay, overlay._stratifyEditSnapshot);
             overlay._stratifyEditSnapshot = null;
@@ -1330,8 +1359,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         } else if (e.key === 'Tab') {
           e.preventDefault();
           const text = el.textContent;
-          this._exitEditMode(overlay, node);
           this._updateNodeText(node, text);
+          this._exitEditMode(overlay, node);
           const undoSnapshot = overlay._stratifyEditSnapshot;
           overlay._stratifyEditSnapshot = null;
           this._addChild(overlay, node, true, undoSnapshot);
@@ -1408,8 +1437,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (!el.isContentEditable) return;
       const text = el.textContent;
       const had = node.rawText || node.text;
-      this._exitEditMode(overlay, node);
       this._updateNodeText(node, text);
+      this._exitEditMode(overlay, node);
       if ((node.rawText || node.text) !== had) {
         this._pushUndoSnapshot(overlay, overlay._stratifyEditSnapshot);
         overlay._stratifyEditSnapshot = null;
@@ -1460,7 +1489,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
   _currentMindmapContent(overlay) {
     if (overlay && overlay._stratifyParsed && overlay._stratifyTreeInfo) {
-      return this._serialize(overlay._stratifyParsed, overlay._stratifyTreeInfo, overlay._stratifyStructure);
+      return this._serializeMindmap(overlay._stratifyParsed, overlay._stratifyTreeInfo, overlay._stratifyStructure);
     }
     return (overlay && overlay._stratifyLastContent) || '';
   }
@@ -1514,7 +1543,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       overlay._stratifySelected = null;
       overlay._stratifyPendingEdit = null;
       overlay._stratifyEditSnapshot = null;
-      await this.app.vault.modify(file, content);
+      await this._writeMindmapContent(overlay, content);
       this._render(overlay, content, frontmatter, file.basename, view, file);
       new obsidian.Notice(this._isZh() ? '已回退上一步导图操作' : 'Undid last mindmap action');
       return true;
@@ -1545,7 +1574,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       overlay._stratifySelected = null;
       overlay._stratifyPendingEdit = null;
       overlay._stratifyEditSnapshot = null;
-      await this.app.vault.modify(file, content);
+      await this._writeMindmapContent(overlay, content);
       this._render(overlay, content, frontmatter, file.basename, view, file);
       new obsidian.Notice(this._isZh() ? '已重做导图操作' : 'Redid mindmap action');
       return true;
@@ -2185,7 +2214,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     if (!file) return;
     this._pushUndoSnapshot(overlay);
     node.collapsed = !node.collapsed;
-    const newContent = this._serialize(overlay._stratifyParsed, overlay._stratifyTreeInfo, overlay._stratifyStructure);
+    const newContent = this._serializeMindmap(overlay._stratifyParsed, overlay._stratifyTreeInfo, overlay._stratifyStructure);
     const selPath = overlay._stratifySelected ? this._pathFor(overlay._stratifySelected, overlay._stratifyTreeInfo) : null;
     overlay._stratifyLastContent = newContent;
     overlay._stratifyParsed = this._parseStructured(newContent, overlay._stratifyStructure);
@@ -2196,7 +2225,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       overlay._stratifySelected._el.focus({ preventScroll: true });
     }
     overlay._stratifyWriting = true;
-    this.app.vault.modify(file, newContent).then(() => {
+    this._writeMindmapContent(overlay, newContent).then(() => {
       requestAnimationFrame(() => { overlay._stratifyWriting = false; });
     }).catch((e) => {
       overlay._stratifyWriting = false;
@@ -2366,7 +2395,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
   async _persistAndRelayout(overlay) {
     const file = overlay._stratifyFile;
     if (!file) return;
-    const newContent = this._serialize(overlay._stratifyParsed, overlay._stratifyTreeInfo, overlay._stratifyStructure);
+    const newContent = this._serializeMindmap(overlay._stratifyParsed, overlay._stratifyTreeInfo, overlay._stratifyStructure);
 
     const selPath = overlay._stratifySelected ? this._pathFor(overlay._stratifySelected, overlay._stratifyTreeInfo) : null;
     const editPath = overlay._stratifyPendingEdit ? this._pathFor(overlay._stratifyPendingEdit, overlay._stratifyTreeInfo) : null;
@@ -2386,7 +2415,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
     try {
       overlay._stratifyWriting = true;
-      await this.app.vault.modify(file, newContent);
+      await this._writeMindmapContent(overlay, newContent);
       requestAnimationFrame(() => { overlay._stratifyWriting = false; });
     } catch (e) {
       overlay._stratifyWriting = false;

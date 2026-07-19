@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1
+
+- Fixed Tab-created child nodes and edited root labels being lost when the active structure diverged from note frontmatter.
+- Made structure-mode changes update the Markdown body and `mindmap-structure` frontmatter atomically.
+- Added a safe parser fallback for notes whose declared structure does not contain any readable nodes.
+
 ## 1.1.0
 
 - Replaced the original palettes with curated categorical schemes based on Paul Tol, Tableau Classic, ColorBrewer Paired, and a restrained dark palette.
