@@ -825,20 +825,18 @@
 
 .stratify-link {
   color: inherit;
-  text-decoration-line: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px;
+  border-bottom: 1px dotted currentColor;
   cursor: pointer;
   pointer-events: auto;
 }
 
 .stratify-link:hover {
-  text-decoration-style: solid;
+  border-bottom-style: solid;
   opacity: 0.85;
 }
 
 .stratify-node.stratify-editing .stratify-link {
-  text-decoration-line: none;
+  border-bottom-color: transparent;
   pointer-events: none;
 }
 
