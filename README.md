@@ -1,6 +1,6 @@
 # Stratify Mindmap
 
-**English** | [简体中文](README_zh-CN.md)
+**English** | [简体中文](https://github.com/Lywooye/stratify-mindmap/blob/main/README_zh-CN.md)
 
 Stratify Mindmap is a Markdown-native mind map plugin for Obsidian. It keeps the source readable on desktop and mobile while supporting structures deeper than Markdown's six heading levels.
 

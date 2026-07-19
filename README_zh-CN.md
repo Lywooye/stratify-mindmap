@@ -1,6 +1,6 @@
 # Stratify Mindmap
 
-[English](README.md) | **简体中文**
+[English](https://github.com/Lywooye/stratify-mindmap/blob/main/README.md) | **简体中文**
 
 Stratify Mindmap 是一个以 Markdown 为数据源的 Obsidian 思维导图插件。它让导图在电脑和手机上仍然保持为可阅读、可编辑的 Markdown，同时支持超过六层的节点结构。
 
