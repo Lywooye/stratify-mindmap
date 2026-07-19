@@ -1,0 +1,10 @@
+{
+  "id": "stratify-mindmap",
+  "name": "Stratify Mindmap",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Markdown-native mind maps with deep heading/list structures, direct editing, drag-and-drop, and keyboard navigation.",
+  "author": "Lywooye",
+  "authorUrl": "https://github.com/Lywooye",
+  "isDesktopOnly": false
+}
