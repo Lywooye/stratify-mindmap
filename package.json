@@ -9,7 +9,7 @@
     "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
     "lint": "eslint .",
     "test": "node test-persistence.cjs",
-    "check": "npm run lint && npm test && npm run build",
+    "check": "npm run lint && npm run build && npm test",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [
