@@ -354,6 +354,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const view = overlay._stratifyView;
     if (view instanceof obsidian.MarkdownView && view.file === file && view.editor) {
       view.editor.setValue(content);
+      view.requestSave();
     } else {
       await this.app.vault.process(file, () => content);
     }
@@ -422,15 +423,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (isMindmap) {
         view.contentEl.addClass('stratify-host');
         let content;
-        const sourceVisible = existing && existing.classList.contains('stratify-hidden');
-        if (existing && !sourceVisible) {
+        try {
+          content = view.editor ? view.editor.getValue() : await this._readFileContent(file);
+        } catch {
           content = await this._readFileContent(file);
-        } else {
-          try {
-            content = view.editor ? view.editor.getValue() : await this._readFileContent(file);
-          } catch {
-            content = await this._readFileContent(file);
-          }
         }
         let overlay = existing;
         if (!overlay) {

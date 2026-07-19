@@ -57,6 +57,7 @@ let editorValue = plugin._newMindmapContent();
 let diskValue = editorValue;
 let writeCount = 0;
 let editorSetCount = 0;
+let requestSaveCount = 0;
 let editorReadCount = 0;
 let vaultReadCount = 0;
 const editor = {
@@ -66,11 +67,16 @@ const editor = {
   },
   setValue: (value) => {
     editorValue = value;
-    diskValue = value;
     editorSetCount += 1;
   },
 };
-const view = Object.assign(new MockMarkdownView(), { file, editor });
+const view = Object.assign(new MockMarkdownView(), {
+  file,
+  editor,
+  requestSave: () => {
+    requestSaveCount += 1;
+  },
+});
 plugin.app = {
   workspace: { getLeavesOfType: () => [{ view }] },
   metadataCache: {
@@ -129,23 +135,28 @@ async function run() {
 
   assert.strictEqual(writeCount, 0, 'an open mind map should not bypass the Editor API');
   assert.strictEqual(editorSetCount, 1, 'saving an open mind map should use one Editor API write');
+  assert.strictEqual(requestSaveCount, 1, 'an Editor API write should request an Obsidian save');
+  assert.notStrictEqual(diskValue, editorValue, 'the regression setup must retain stale disk content');
 
   const renderedContents = [];
   plugin._render = (targetOverlay, content) => renderedContents.push(content);
   editorReadCount = 0;
   vaultReadCount = 0;
   await plugin._doScan();
-  assert.strictEqual(vaultReadCount, 1, 'a visible mindmap must scan the saved vault content');
-  assert.strictEqual(editorReadCount, 0, 'a visible mindmap must not scan a stale editor buffer');
-  assert.deepStrictEqual(renderedContents, [], 'a stale editor buffer must not replace the newly rendered child');
+  assert.strictEqual(editorReadCount, 1, 'an open mindmap must scan the live editor buffer');
+  assert.strictEqual(vaultReadCount, 0, 'an open mindmap must not scan stale disk content');
+  assert.deepStrictEqual(renderedContents, [], 'stale disk content must not replace the newly rendered child');
 
+  const persistedEditorValue = editorValue;
   sourceVisible = true;
-  editorValue = diskValue.replace('Renamed Root', 'Source Root');
+  editorValue = persistedEditorValue.replace('Renamed Root', 'Source Root');
   await plugin._doScan();
-  assert.strictEqual(editorReadCount, 1, 'source mode must scan the live editor buffer');
+  assert.strictEqual(editorReadCount, 2, 'source mode must scan the live editor buffer');
   assert.strictEqual(overlay._stratifyStaleContent, editorValue);
   sourceVisible = false;
 
+  editorValue = persistedEditorValue;
+  diskValue = editorValue;
   const reopenedFrontmatter = plugin._splitFrontmatter(diskValue).frontmatter;
   const reopenedMode = plugin._readStructureFromFrontmatter(reopenedFrontmatter);
   const reopenedParsed = plugin._parseStructured(diskValue, reopenedMode);
@@ -156,6 +167,7 @@ async function run() {
   assert.strictEqual(reopenedTree.tree.children[0].rawText, 'New Title');
 
   const beforeModeWrite = editorSetCount;
+  const beforeModeSaveRequest = requestSaveCount;
   const headingContent = plugin._serializeMindmap(
     overlay._stratifyParsed,
     overlay._stratifyTreeInfo,
@@ -167,7 +179,8 @@ async function run() {
   await plugin._writeMindmapContent(overlay, headingContent);
   overlay._stratifyWriting = false;
   assert.strictEqual(editorSetCount, beforeModeWrite + 1, 'mode changes must persist as one complete editor write');
-  assert.strictEqual(diskValue, headingContent);
+  assert.strictEqual(requestSaveCount, beforeModeSaveRequest + 1, 'mode changes must request an Obsidian save');
+  assert.strictEqual(editorValue, headingContent);
 
   const broken = headingContent.replace('mindmap-structure: heading', 'mindmap-structure: list');
   const brokenFrontmatter = plugin._splitFrontmatter(broken).frontmatter;

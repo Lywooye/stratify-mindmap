@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4
+
+- Fixed newly added nodes and edited root labels reverting before Obsidian saved the active editor to disk.
+- Made open mind maps read from the live Editor API and request a save after each structured edit.
+- Added a delayed-disk regression test for Tab-created child persistence.
+
 ## 1.1.3
 
 - Added reproducible TypeScript, npm, ESLint, CI, and GitHub Release tooling for Obsidian Community submission.
