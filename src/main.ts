@@ -675,6 +675,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
         if (!overlay) {
           overlay = view.contentEl.createDiv({ cls: 'stratify-overlay' });
         }
+        overlay.classList.toggle('stratify-mobile', obsidian.Platform.isMobile);
         if (overlay.classList.contains('stratify-hidden')) {
           view.contentEl.removeClass('stratify-map-visible');
         } else {
@@ -1355,7 +1356,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     };
 
     const toolbar = overlay.createDiv({ cls: 'stratify-toolbar' });
-    const structureGroup = toolbar.createDiv({ cls: 'stratify-toolbar-group' });
+    const structureGroup = toolbar.createDiv({ cls: 'stratify-toolbar-group stratify-structure-control' });
     structureGroup.createSpan({ cls: 'stratify-toolbar-label', text: 'Mode' });
     const structureSelect = structureGroup.createEl('select', { cls: 'stratify-select' });
     for (const id of objectKeys(STRUCTURE_MODES)) {
@@ -1400,7 +1401,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       }
     };
 
-    const layoutGroup = toolbar.createDiv({ cls: 'stratify-toolbar-group' });
+    const layoutGroup = toolbar.createDiv({ cls: 'stratify-toolbar-group stratify-layout-control' });
     layoutGroup.createSpan({ cls: 'stratify-toolbar-label', text: 'Layout' });
     const layoutSelect = layoutGroup.createEl('select', { cls: 'stratify-select' });
     for (const l of [
@@ -1424,8 +1425,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
 
     const actions = toolbar.createDiv({ cls: 'stratify-toolbar-group stratify-toolbar-actions' });
     const fitBtn = makeIconButton(actions, 'maximize-2', 'Fit mindmap to view');
-    const zoomInBtn = makeIconButton(actions, 'plus', 'Zoom in');
-    const zoomOutBtn = makeIconButton(actions, 'minus', 'Zoom out');
+    const zoomInBtn = makeIconButton(actions, 'plus', 'Zoom in', 'stratify-desktop-zoom');
+    const zoomOutBtn = makeIconButton(actions, 'minus', 'Zoom out', 'stratify-desktop-zoom');
     const editBtn = makeIconButton(actions, 'file-pen-line', 'Edit Markdown source');
     const showSource = () => {
       overlay.classList.add('stratify-hidden');
@@ -1435,11 +1436,12 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     editBtn.onclick = showSource;
 
     if (this._hasSourceOnlyContent(parsed)) {
+      editBtn.classList.add('stratify-mobile-source-only');
       const sourceOnlyBtn = makeIconButton(
         actions,
         'file-text',
         'Markdown-only content is preserved in the source',
-        'stratify-source-only'
+        'stratify-source-only stratify-desktop-source-only'
       );
       sourceOnlyBtn.onclick = showSource;
     }
@@ -1447,7 +1449,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const more = toolbar.createEl('details', { cls: 'stratify-more' });
     const moreToggle = more.createEl('summary', {
       cls: 'stratify-btn stratify-icon-btn',
-      attr: { 'aria-label': 'Appearance and export', title: 'Appearance and export' }
+      attr: { 'aria-label': 'View and export options', title: 'View and export options' }
     });
     obsidian.setIcon(moreToggle, 'sliders-horizontal');
     const morePanel = more.createDiv({ cls: 'stratify-more-panel' });
@@ -1524,6 +1526,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       void this._persistFrontmatterValue(file, 'mindmap-node', id);
     };
 
+    const mobileZoomGroup = morePanel.createDiv({
+      cls: 'stratify-toolbar-field stratify-mobile-only stratify-mobile-zoom'
+    });
+    mobileZoomGroup.createSpan({ cls: 'stratify-toolbar-label', text: 'Zoom' });
+    const mobileZoomActions = mobileZoomGroup.createDiv({ cls: 'stratify-mobile-zoom-actions' });
+    const mobileZoomOutBtn = makeIconButton(mobileZoomActions, 'minus', 'Zoom out');
+    const mobileZoomInBtn = makeIconButton(mobileZoomActions, 'plus', 'Zoom in');
+
     const exportBtn = morePanel.createEl('button', {
       cls: 'stratify-btn stratify-menu-action',
       attr: { type: 'button' }
@@ -1578,6 +1588,8 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     fitBtn.onclick = () => this._fitTo(canvas, inner);
     zoomInBtn.onclick = () => this._zoomBy(canvas, inner, 1.2);
     zoomOutBtn.onclick = () => this._zoomBy(canvas, inner, 1 / 1.2);
+    mobileZoomInBtn.onclick = () => this._zoomBy(canvas, inner, 1.2);
+    mobileZoomOutBtn.onclick = () => this._zoomBy(canvas, inner, 1 / 1.2);
 
     this._renderTreeIntoCanvas(overlay, false);
   }

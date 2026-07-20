@@ -21,6 +21,7 @@ function stringifyYaml(value) {
 }
 
 class MockMarkdownView {}
+const mockPlatform = { isMobile: false };
 
 Module._load = function (request, parent, isMain) {
   if (request !== 'obsidian') return originalLoad.call(this, request, parent, isMain);
@@ -28,6 +29,7 @@ Module._load = function (request, parent, isMain) {
     Plugin: class {},
     PluginSettingTab: class {},
     MarkdownView: MockMarkdownView,
+    Platform: mockPlatform,
     parseYaml,
     stringifyYaml,
   };
@@ -113,8 +115,13 @@ async function run() {
     _stratifyPendingEdit: null,
   };
   let sourceVisible = false;
+  const overlayClasses = new Set();
   overlay.classList = {
-    contains: (name) => name === 'stratify-hidden' && sourceVisible,
+    contains: (name) => (name === 'stratify-hidden' && sourceVisible) || overlayClasses.has(name),
+    toggle: (name, force) => {
+      if (force) overlayClasses.add(name);
+      else overlayClasses.delete(name);
+    },
   };
   overlay.dataset = {};
   overlay.ownerDocument = {
@@ -147,7 +154,10 @@ async function run() {
   plugin._render = (targetOverlay, content) => renderedContents.push(content);
   editorReadCount = 0;
   vaultReadCount = 0;
+  mockPlatform.isMobile = true;
   await plugin._doScan();
+  assert.ok(overlayClasses.has('stratify-mobile'), 'mobile scans must mark the overlay for touch-safe toolbar styles');
+  mockPlatform.isMobile = false;
   assert.strictEqual(editorReadCount, 1, 'an open mindmap must scan the live editor buffer');
   assert.strictEqual(vaultReadCount, 0, 'an open mindmap must not scan stale disk content');
   assert.deepStrictEqual(renderedContents, [], 'stale disk content must not replace the newly rendered child');
@@ -285,7 +295,12 @@ async function run() {
   plugin.app.workspace.getLeavesOfType = getLeavesOfType;
   plugin.app.vault.cachedRead = cachedRead;
 
-  console.log('Tab display, persistence, reopen, atomic mode, and mismatch recovery tests passed');
+  const styles = fs.readFileSync(path.resolve('./styles.css'), 'utf8');
+  assert.match(styles, /--stratify-safe-top:[^;]*safe-area-inset-top/);
+  assert.match(styles, /\.stratify-overlay\.stratify-mobile \.stratify-icon-btn\s*\{[^}]*width: 44px/s);
+  assert.match(styles, /\.stratify-overlay\.stratify-mobile \.stratify-more-panel\s*\{[^}]*left:/s);
+
+  console.log('Persistence, rendering, lifecycle, and mobile toolbar tests passed');
 }
 
 run().catch((error) => {

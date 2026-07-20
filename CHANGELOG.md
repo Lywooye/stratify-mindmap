@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.9
+
+- Kept the mobile toolbar at the top while moving its controls below iOS and Android display cutouts.
+- Increased mobile controls to 44-pixel touch targets and kept Mode, Layout, Fit, Edit Markdown, and options in one row.
+- Moved mobile zoom controls into the full-width options panel and changed source-only content to an edit-button status marker.
+- Left the desktop toolbar unchanged.
+
 ## 1.1.5
 
 - Fixed layout measurements after zooming and stopped wheel or button zoom from drifting at scale limits.

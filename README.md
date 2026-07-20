@@ -20,6 +20,7 @@ The interface is deliberately compact: structure and layout stay in the main too
 - Configurable node font size and matching PNG export text
 - Automatic wrapping for long labels and a more compact layout
 - Source-only Markdown preservation indicators
+- Safe-area-aware mobile toolbar with 44-pixel touch targets
 - Desktop and mobile support
 
 ## Interface Preview
@@ -36,7 +37,7 @@ The images below are interface previews of the current Stratify layout.
 
 ### Mobile Toolbar
 
-<img src="https://raw.githubusercontent.com/Lywooye/stratify-mindmap/main/assets/mobile-toolbar.png" alt="Stratify Mindmap mobile toolbar and appearance menu" width="390">
+<img src="https://raw.githubusercontent.com/Lywooye/stratify-mindmap/main/assets/mobile-toolbar.png" alt="Stratify Mindmap mobile toolbar below the Dynamic Island safe area" width="390">
 
 ## Markdown Structure Modes
 
@@ -73,7 +74,7 @@ mindmap-node: rounded
 
 Headings and list items become mind map nodes. Other Markdown, including ordinary paragraphs, blockquotes, code blocks, tables, and comments, remains in the source instead of being silently converted into nodes or comments.
 
-Content before the first node is preserved as document-level source. Content after a node stays attached to that node. An orange marker on a node and the file-text icon in the toolbar indicate that source-only Markdown is present; selecting the toolbar icon opens the Markdown source.
+Content before the first node is preserved as document-level source. Content after a node stays attached to that node. An orange marker on a node indicates that source-only Markdown is present. The desktop toolbar shows a matching file-text button; on mobile, the Edit Markdown button carries the status marker instead.
 
 Normal rendering, node editing, and structure-mode conversion preserve this content. Moving a node also moves its attached source block. Deleting that node deletes the attached block as part of the same undoable operation. A document containing only source-only content renders an empty-map state while leaving the Markdown unchanged.
 
@@ -99,7 +100,7 @@ Dragging onto the upper or lower part of a node inserts before or after it. Drop
 
 ## Toolbar and Settings
 
-The main toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. The appearance menu shows every theme as a named row of color swatches, followed by connector style, node shape, and PNG export. Exported images are saved beside the source note as `<note-name>.mindmap.png`, on both desktop and mobile.
+The desktop toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. On mobile, a single top row keeps Mode, Layout, Fit, Edit Markdown, and options below the system safe area with 44-pixel touch targets; zoom moves into the full-width options panel. The options menu shows every theme as a named row of color swatches, followed by connector style, node shape, zoom on mobile, and PNG export. Exported images are saved beside the source note as `<note-name>.mindmap.png`, on both desktop and mobile.
 
 The Obsidian settings page controls defaults for new or unconfigured maps, the global node font size, keyboard navigation, and leaf-node drop behavior. Existing frontmatter is not overwritten by changing defaults.
 

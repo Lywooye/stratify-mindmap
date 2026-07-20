@@ -276,6 +276,10 @@
   justify-content: flex-start;
 }
 
+.stratify-mobile-only {
+  display: none;
+}
+
 /* ---------- Canvas ---------- */
 
 .stratify-canvas {
@@ -887,52 +891,127 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
+.stratify-overlay.stratify-mobile {
+  --stratify-node-max-width: 220px;
+  --stratify-safe-top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px));
+  --stratify-safe-right: max(var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px));
+  --stratify-safe-left: max(var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
+}
+
+.stratify-overlay.stratify-mobile .stratify-toolbar {
+  position: relative;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-height: 0;
+  padding:
+    calc(var(--stratify-safe-top) + 4px)
+    max(8px, var(--stratify-safe-right))
+    4px
+    max(8px, var(--stratify-safe-left));
+}
+
+.stratify-overlay.stratify-mobile .stratify-toolbar > .stratify-toolbar-group > .stratify-toolbar-label {
+  display: none;
+}
+
+.stratify-overlay.stratify-mobile .stratify-structure-control,
+.stratify-overlay.stratify-mobile .stratify-layout-control {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 96px;
+}
+
+.stratify-overlay.stratify-mobile .stratify-toolbar-actions {
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.stratify-overlay.stratify-mobile .stratify-select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 44px;
+  padding: 0 20px 0 7px;
+  font-size: 13px;
+}
+
+.stratify-overlay.stratify-mobile .stratify-icon-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+.stratify-overlay.stratify-mobile .stratify-icon-btn svg,
+.stratify-overlay.stratify-mobile .stratify-menu-action svg {
+  width: 20px;
+  height: 20px;
+}
+
+.stratify-overlay.stratify-mobile .stratify-desktop-zoom,
+.stratify-overlay.stratify-mobile .stratify-desktop-source-only {
+  display: none;
+}
+
+.stratify-overlay.stratify-mobile .stratify-mobile-source-only {
+  position: relative;
+}
+
+.stratify-overlay.stratify-mobile .stratify-mobile-source-only::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-orange, #D97706);
+  box-shadow: 0 0 0 1px var(--background-primary);
+}
+
+.stratify-overlay.stratify-mobile .stratify-more {
+  position: static;
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+
+.stratify-overlay.stratify-mobile .stratify-more-panel {
+  top: calc(100% + 6px);
+  right: max(8px, var(--stratify-safe-right));
+  left: max(8px, var(--stratify-safe-left));
+  width: auto;
+  max-height: min(58vh, calc(100vh - var(--stratify-safe-top) - 72px));
+  max-height: min(58dvh, calc(100dvh - var(--stratify-safe-top) - 72px));
+  box-sizing: border-box;
+}
+
+.stratify-overlay.stratify-mobile .stratify-more-panel .stratify-toolbar-label {
+  display: block;
+}
+
+.stratify-overlay.stratify-mobile .stratify-more-panel .stratify-select {
+  height: 44px;
+}
+
+.stratify-overlay.stratify-mobile .stratify-mobile-only {
+  display: grid;
+}
+
+.stratify-overlay.stratify-mobile .stratify-mobile-zoom {
+  align-items: center;
+}
+
+.stratify-overlay.stratify-mobile .stratify-mobile-zoom-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.stratify-overlay.stratify-mobile .stratify-menu-action {
+  min-height: 44px;
+}
+
 @media (max-width: 520px) {
-  .stratify-overlay {
-    --stratify-node-max-width: 220px;
-  }
-
-  .stratify-toolbar {
-    gap: 4px;
-    padding: 5px 6px;
-  }
-
-  .stratify-toolbar-label {
-    display: none;
-  }
-
-  .stratify-toolbar-group {
-    gap: 4px;
-  }
-
-  .stratify-toolbar-actions {
-    margin-left: 0;
-  }
-
-  .stratify-select {
-    max-width: 88px;
-  }
-
-  .stratify-more-panel .stratify-toolbar-label {
-    display: block;
-  }
-
-  .stratify-more-panel .stratify-select {
-    max-width: none;
-  }
-
-  .stratify-more {
-    margin-left: auto;
-  }
-
-  .stratify-more-panel {
-    width: min(300px, calc(100vw - 16px));
-  }
-
-  .stratify-theme-picker {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .stratify-fab {
     right: 12px;
     bottom: 12px;
