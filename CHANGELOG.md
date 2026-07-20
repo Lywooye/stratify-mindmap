@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.10
+
+- Moved the mobile toolbar below Obsidian's own top view controls instead of sharing the same row.
+- Derived the offset from Obsidian's `--view-header-height` and the device safe area, with stable fallbacks.
+- Kept the toolbar, canvas, and downward-opening options panel in normal layout flow.
+
 ## 1.1.9
 
 - Kept the mobile toolbar at the top while moving its controls below iOS and Android display cutouts.

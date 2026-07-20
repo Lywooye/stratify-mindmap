@@ -20,7 +20,7 @@ The interface is deliberately compact: structure and layout stay in the main too
 - Configurable node font size and matching PNG export text
 - Automatic wrapping for long labels and a more compact layout
 - Source-only Markdown preservation indicators
-- Safe-area-aware mobile toolbar with 44-pixel touch targets
+- Mobile toolbar below the system safe area and Obsidian view controls, with 44-pixel touch targets
 - Desktop and mobile support
 
 ## Interface Preview
@@ -100,7 +100,7 @@ Dragging onto the upper or lower part of a node inserts before or after it. Drop
 
 ## Toolbar and Settings
 
-The desktop toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. On mobile, a single top row keeps Mode, Layout, Fit, Edit Markdown, and options below the system safe area with 44-pixel touch targets; zoom moves into the full-width options panel. The options menu shows every theme as a named row of color swatches, followed by connector style, node shape, zoom on mobile, and PNG export. Exported images are saved beside the source note as `<note-name>.mindmap.png`, on both desktop and mobile.
+The desktop toolbar keeps Mode, Layout, Fit, Zoom, and Edit Markdown available. On mobile, a single top row keeps Mode, Layout, Fit, Edit Markdown, and options below both the system safe area and Obsidian's view controls, with 44-pixel touch targets; zoom moves into the full-width options panel. The options menu shows every theme as a named row of color swatches, followed by connector style, node shape, zoom on mobile, and PNG export. Exported images are saved beside the source note as `<note-name>.mindmap.png`, on both desktop and mobile.
 
 The Obsidian settings page controls defaults for new or unconfigured maps, the global node font size, keyboard navigation, and leaf-node drop behavior. Existing frontmatter is not overwritten by changing defaults.
 

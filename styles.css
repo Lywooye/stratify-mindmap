@@ -896,6 +896,9 @@
   --stratify-safe-top: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px));
   --stratify-safe-right: max(var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px));
   --stratify-safe-left: max(var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px));
+  --stratify-mobile-toolbar-offset: calc(
+    var(--stratify-safe-top) + var(--view-header-height, 50px) + var(--size-4-2, 8px)
+  );
 }
 
 .stratify-overlay.stratify-mobile .stratify-toolbar {
@@ -903,8 +906,9 @@
   flex-wrap: nowrap;
   gap: 4px;
   min-height: 0;
+  margin-top: var(--stratify-mobile-toolbar-offset);
   padding:
-    calc(var(--stratify-safe-top) + 4px)
+    4px
     max(8px, var(--stratify-safe-right))
     4px
     max(8px, var(--stratify-safe-left));
@@ -981,8 +985,8 @@
   right: max(8px, var(--stratify-safe-right));
   left: max(8px, var(--stratify-safe-left));
   width: auto;
-  max-height: min(58vh, calc(100vh - var(--stratify-safe-top) - 72px));
-  max-height: min(58dvh, calc(100dvh - var(--stratify-safe-top) - 72px));
+  max-height: min(58vh, calc(100vh - var(--stratify-mobile-toolbar-offset) - 72px));
+  max-height: min(58dvh, calc(100dvh - var(--stratify-mobile-toolbar-offset) - 72px));
   box-sizing: border-box;
 }
 

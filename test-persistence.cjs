@@ -297,6 +297,8 @@ async function run() {
 
   const styles = fs.readFileSync(path.resolve('./styles.css'), 'utf8');
   assert.match(styles, /--stratify-safe-top:[^;]*safe-area-inset-top/);
+  assert.match(styles, /--stratify-mobile-toolbar-offset:[^;]*--view-header-height/s);
+  assert.match(styles, /margin-top: var\(--stratify-mobile-toolbar-offset\)/);
   assert.match(styles, /\.stratify-overlay\.stratify-mobile \.stratify-icon-btn\s*\{[^}]*width: 44px/s);
   assert.match(styles, /\.stratify-overlay\.stratify-mobile \.stratify-more-panel\s*\{[^}]*left:/s);
 
