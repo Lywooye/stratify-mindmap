@@ -248,6 +248,110 @@ async function run() {
   plugin._zoomBy(zoomCanvas, zoomInner, 2);
   assert.deepStrictEqual(zoomCanvas._stratify, { tx: -200, ty: -150, scale: 2 });
 
+  const fitInner = { style: { width: '800px', height: '400px' } };
+  const fitCanvas = {
+    _stratify: { tx: 12, ty: 18, scale: 0.75 },
+    clientWidth: 0,
+    clientHeight: 0,
+  };
+  assert.strictEqual(plugin._fitTo(fitCanvas, fitInner), false);
+  assert.deepStrictEqual(
+    fitCanvas._stratify,
+    { tx: 12, ty: 18, scale: 0.75 },
+    'a hidden startup canvas must not overwrite its transform with a zero scale'
+  );
+  fitCanvas.clientWidth = 1000;
+  fitCanvas.clientHeight = 600;
+  assert.strictEqual(plugin._fitTo(fitCanvas, fitInner), true);
+  assert.deepStrictEqual(fitCanvas._stratify, { tx: 100, ty: 100, scale: 1 });
+
+  const geometryFrames = new Map();
+  let nextGeometryFrame = 1;
+  let geometryObserverCallback = null;
+  let geometryObserverDisconnected = false;
+  const geometryWindow = {
+    requestAnimationFrame: (callback) => {
+      const id = nextGeometryFrame++;
+      geometryFrames.set(id, callback);
+      return id;
+    },
+    cancelAnimationFrame: (id) => geometryFrames.delete(id),
+    ResizeObserver: class {
+      constructor(callback) {
+        geometryObserverCallback = callback;
+      }
+      observe() {}
+      disconnect() {
+        geometryObserverDisconnected = true;
+      }
+    },
+  };
+  const flushGeometryFrames = () => {
+    const pending = Array.from(geometryFrames.values());
+    geometryFrames.clear();
+    pending.forEach((callback) => callback());
+  };
+  const geometryCanvas = {
+    _stratify: { tx: 0, ty: 0, scale: 1 },
+    clientWidth: 0,
+    clientHeight: 0,
+    ownerDocument: { defaultView: geometryWindow },
+  };
+  const geometryInner = { style: { width: '800px', height: '400px' } };
+  const geometryOverlay = {
+    _stratifyCanvas: geometryCanvas,
+    _stratifyInner: geometryInner,
+    _stratifyLayoutReady: false,
+    _stratifyRenderPending: false,
+    _stratifyPendingPreserveTransform: false,
+    _stratifyUserTransformed: false,
+    _stratifyCleanup: null,
+  };
+  const originalRenderTreeIntoCanvas = plugin._renderTreeIntoCanvas;
+  const originalFitTo = plugin._fitTo;
+  const geometryRenders = [];
+  let geometryFits = 0;
+  plugin._renderTreeIntoCanvas = (target, preserveTransform) => {
+    geometryRenders.push([target, preserveTransform]);
+  };
+  plugin._fitTo = () => {
+    geometryFits += 1;
+    return true;
+  };
+  plugin._bindCanvasGeometry(geometryCanvas, geometryInner, geometryOverlay);
+  assert.ok(geometryObserverCallback, 'canvas geometry recovery must observe restored tabs');
+
+  geometryObserverCallback();
+  flushGeometryFrames();
+  assert.strictEqual(geometryRenders.length, 0, 'a hidden canvas must wait for a usable size');
+
+  geometryCanvas.clientWidth = 900;
+  geometryCanvas.clientHeight = 600;
+  geometryObserverCallback();
+  flushGeometryFrames();
+  assert.deepStrictEqual(
+    geometryRenders,
+    [[geometryOverlay, false]],
+    'a restored background tab must rerender once its canvas becomes visible'
+  );
+
+  geometryOverlay._stratifyLayoutReady = true;
+  geometryCanvas.clientWidth = 1000;
+  geometryObserverCallback();
+  flushGeometryFrames();
+  assert.strictEqual(geometryFits, 1, 'an untouched map must refit after startup geometry settles');
+
+  geometryOverlay._stratifyUserTransformed = true;
+  geometryCanvas.clientWidth = 1100;
+  geometryObserverCallback();
+  flushGeometryFrames();
+  assert.strictEqual(geometryFits, 1, 'geometry recovery must not override a user transform');
+
+  geometryOverlay._stratifyCleanup();
+  assert.ok(geometryObserverDisconnected, 'render cleanup must disconnect the canvas observer');
+  plugin._renderTreeIntoCanvas = originalRenderTreeIntoCanvas;
+  plugin._fitTo = originalFitTo;
+
   assert.deepStrictEqual(plugin._hexToRgb('rgb(255, 255, 255)'), [255, 255, 255]);
   assert.deepStrictEqual(plugin._hexToRgb('rgba(12, 34, 56, 0.5)'), [12, 34, 56]);
   assert.deepStrictEqual(plugin._hexToRgb('#abc'), [170, 187, 204]);

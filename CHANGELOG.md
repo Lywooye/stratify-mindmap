@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Deferred initial node measurement until both the canvas and root node have usable dimensions.
+- Recovered layouts automatically when restored tabs or workspace panes become visible.
+- Refit untouched maps while startup geometry settles without overriding user pan or zoom.
+- Guarded Fit against zero, non-finite, and otherwise invalid dimensions.
+- Added regression coverage for hidden startup canvases, restored tabs, and transform preservation.
+
 ## 1.1.10
 
 - Moved the mobile toolbar below Obsidian's own top view controls instead of sharing the same row.

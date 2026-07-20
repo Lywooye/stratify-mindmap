@@ -166,6 +166,7 @@ interface StratifyOverlayElement extends HTMLDivElement {
   _stratifyFrontmatter?: Frontmatter | null;
   _stratifyInner?: HTMLDivElement | null;
   _stratifyLastContent?: string | null;
+  _stratifyLayoutReady?: boolean;
   _stratifyLayout?: LayoutId | null;
   _stratifyLine?: LineStyleId | null;
   _stratifyMention?: MentionState | null;
@@ -175,8 +176,12 @@ interface StratifyOverlayElement extends HTMLDivElement {
   _stratifyNodesLayer?: HTMLDivElement | null;
   _stratifyParsed?: ParsedMindmap | null;
   _stratifyPendingEdit?: MindmapNode | null;
+  _stratifyPendingPreserveTransform?: boolean;
   _stratifyPointerDrag?: NodePointerDrag | null;
   _stratifyRedoStack?: string[];
+  _stratifyRenderFrame?: number | null;
+  _stratifyRenderGeneration?: number;
+  _stratifyRenderPending?: boolean;
   _stratifySelected?: MindmapNode | null;
   _stratifySideCache?: SideCacheEntry[] | null;
   _stratifyStaleContent?: string;
@@ -188,6 +193,7 @@ interface StratifyOverlayElement extends HTMLDivElement {
   _stratifyTheme?: ThemeId | null;
   _stratifyTreeInfo?: TreeInfo | null;
   _stratifyUndoStack?: string[];
+  _stratifyUserTransformed?: boolean;
   _stratifyView?: obsidian.MarkdownView | null;
   _stratifyWriting?: boolean;
 }
@@ -1151,7 +1157,10 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       } else {
         const canvas = overlay.querySelector<StratifyCanvasElement>(':scope > .stratify-canvas');
         const inner = canvas?.querySelector<HTMLDivElement>(':scope > .stratify-inner');
-        if (canvas && inner) this._fitTo(canvas, inner);
+        if (canvas && inner) {
+          overlay._stratifyUserTransformed = false;
+          this._fitTo(canvas, inner);
+        }
       }
     };
   }
@@ -1581,15 +1590,29 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     overlay._stratifyInner = inner;
     overlay._stratifySvg = svg;
     overlay._stratifyNodesLayer = nodesLayer;
+    overlay._stratifyLayoutReady = false;
+    overlay._stratifyRenderPending = false;
+    overlay._stratifyPendingPreserveTransform = false;
+    overlay._stratifyUserTransformed = false;
 
     this._bindPanZoom(canvas, inner, overlay);
     this._bindCanvasClick(canvas, overlay);
+    this._bindCanvasGeometry(canvas, inner, overlay);
 
-    fitBtn.onclick = () => this._fitTo(canvas, inner);
-    zoomInBtn.onclick = () => this._zoomBy(canvas, inner, 1.2);
-    zoomOutBtn.onclick = () => this._zoomBy(canvas, inner, 1 / 1.2);
-    mobileZoomInBtn.onclick = () => this._zoomBy(canvas, inner, 1.2);
-    mobileZoomOutBtn.onclick = () => this._zoomBy(canvas, inner, 1 / 1.2);
+    fitBtn.onclick = () => {
+      overlay._stratifyUserTransformed = false;
+      this._fitTo(canvas, inner);
+    };
+    zoomInBtn.onclick = () => {
+      overlay._stratifyUserTransformed = true;
+      this._zoomBy(canvas, inner, 1.2);
+    };
+    zoomOutBtn.onclick = () => {
+      overlay._stratifyUserTransformed = true;
+      this._zoomBy(canvas, inner, 1 / 1.2);
+    };
+    mobileZoomInBtn.onclick = zoomInBtn.onclick;
+    mobileZoomOutBtn.onclick = zoomOutBtn.onclick;
 
     this._renderTreeIntoCanvas(overlay, false);
   }
@@ -1603,6 +1626,18 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     const tree = treeInfo && treeInfo.tree;
     if (!tree || !canvas || !inner || !svg || !nodesLayer) return;
 
+    const ownerWindow = overlay.ownerDocument.defaultView || window;
+    const generation = (overlay._stratifyRenderGeneration || 0) + 1;
+    overlay._stratifyRenderGeneration = generation;
+    if (overlay._stratifyRenderFrame !== null && overlay._stratifyRenderFrame !== undefined) {
+      ownerWindow.cancelAnimationFrame(overlay._stratifyRenderFrame);
+    }
+    overlay._stratifyRenderFrame = null;
+    overlay._stratifyRenderPending = true;
+    overlay._stratifyLayoutReady = false;
+    overlay._stratifyPendingPreserveTransform = preserveTransform;
+    if (!preserveTransform) overlay._stratifyUserTransformed = false;
+
     const savedTransform = preserveTransform ? { ...canvas._stratify } : null;
 
     nodesLayer.empty();
@@ -1612,40 +1647,83 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     this._assignColors(tree, theme.palette, theme.rootAccent);
     this._createNodes(tree, nodesLayer, overlay);
 
-    (overlay.ownerDocument.defaultView || window).requestAnimationFrame(() => {
-      const measureScale = (canvas._stratify && canvas._stratify.scale) || 1;
-      this._measureNodes(tree, measureScale);
-      const layout = this._normalizeLayout(overlay._stratifyLayout) || DEFAULT_LAYOUT;
-      const line = this._normalizeLine(overlay._stratifyLine) || DEFAULT_LINE;
-      this._layoutTree(tree, layout, overlay);
-      const bounds = this._computeBounds(tree);
-      const w = bounds.maxX - bounds.minX + PAD * 2;
-      const h = bounds.maxY - bounds.minY + PAD * 2;
-      this._shiftTree(tree, PAD - bounds.minX, PAD - bounds.minY);
-      this._applyNodePositions(tree);
-      inner.style.width = w + 'px';
-      inner.style.height = h + 'px';
-      svg.setAttribute('width', String(w));
-      svg.setAttribute('height', String(h));
-      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-      this._drawConnections(tree, svg, layout, line);
+    const isCurrentRender = (): boolean => (
+      overlay._stratifyRenderGeneration === generation &&
+      overlay._stratifyCanvas === canvas &&
+      overlay._stratifyInner === inner
+    );
+    const finishUnavailable = (): void => {
+      if (!isCurrentRender()) return;
+      overlay._stratifyRenderFrame = null;
+      overlay._stratifyRenderPending = false;
+      overlay._stratifyLayoutReady = false;
+    };
 
-      if (savedTransform) {
-        canvas._stratify = savedTransform;
-        this._applyTransform(inner, savedTransform);
-      } else {
-        this._fitTo(canvas, inner);
-      }
+    overlay._stratifyRenderFrame = ownerWindow.requestAnimationFrame(() => {
+      if (!isCurrentRender()) return;
+      overlay._stratifyRenderFrame = ownerWindow.requestAnimationFrame(() => {
+        if (!isCurrentRender()) return;
+        overlay._stratifyRenderFrame = null;
 
-      if (overlay._stratifySelected && overlay._stratifySelected._el) {
-        overlay._stratifySelected._el.classList.add('stratify-selected');
-        overlay._stratifySelected._el.focus({ preventScroll: true });
-      }
-      if (overlay._stratifyPendingEdit) {
-        const node = overlay._stratifyPendingEdit;
-        overlay._stratifyPendingEdit = null;
-        if (node && node._el) this._startEdit(overlay, node);
-      }
+        const rootRect = tree._el?.getBoundingClientRect();
+        if (
+          canvas.clientWidth <= 1 ||
+          canvas.clientHeight <= 1 ||
+          !rootRect ||
+          rootRect.width <= 0 ||
+          rootRect.height <= 0
+        ) {
+          finishUnavailable();
+          return;
+        }
+
+        const measureScale = (canvas._stratify && canvas._stratify.scale) || 1;
+        this._measureNodes(tree, measureScale);
+        const layout = this._normalizeLayout(overlay._stratifyLayout) || DEFAULT_LAYOUT;
+        const line = this._normalizeLine(overlay._stratifyLine) || DEFAULT_LINE;
+        this._layoutTree(tree, layout, overlay);
+        const bounds = this._computeBounds(tree);
+        const w = bounds.maxX - bounds.minX + PAD * 2;
+        const h = bounds.maxY - bounds.minY + PAD * 2;
+        this._shiftTree(tree, PAD - bounds.minX, PAD - bounds.minY);
+        this._applyNodePositions(tree);
+        inner.style.width = w + 'px';
+        inner.style.height = h + 'px';
+        svg.setAttribute('width', String(w));
+        svg.setAttribute('height', String(h));
+        svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        this._drawConnections(tree, svg, layout, line);
+
+        const canRestoreTransform = savedTransform &&
+          Number.isFinite(savedTransform.tx) &&
+          Number.isFinite(savedTransform.ty) &&
+          Number.isFinite(savedTransform.scale) &&
+          savedTransform.scale > 0;
+        if (canRestoreTransform) {
+          canvas._stratify = savedTransform;
+          this._applyTransform(inner, savedTransform);
+        } else {
+          overlay._stratifyUserTransformed = false;
+          if (!this._fitTo(canvas, inner)) {
+            finishUnavailable();
+            return;
+          }
+        }
+
+        overlay._stratifyRenderPending = false;
+        overlay._stratifyLayoutReady = true;
+        overlay._stratifyPendingPreserveTransform = false;
+
+        if (overlay._stratifySelected && overlay._stratifySelected._el) {
+          overlay._stratifySelected._el.classList.add('stratify-selected');
+          overlay._stratifySelected._el.focus({ preventScroll: true });
+        }
+        if (overlay._stratifyPendingEdit) {
+          const node = overlay._stratifyPendingEdit;
+          overlay._stratifyPendingEdit = null;
+          if (node && node._el) this._startEdit(overlay, node);
+        }
+      });
     });
   }
 
@@ -3259,6 +3337,64 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     });
   }
 
+  _bindCanvasGeometry(
+    canvas: StratifyCanvasElement,
+    inner: HTMLDivElement,
+    overlay: StratifyOverlayElement
+  ): void {
+    const ownerWindow = canvas.ownerDocument.defaultView || window;
+    let geometryFrame: number | null = null;
+    let lastWidth = canvas.clientWidth;
+    let lastHeight = canvas.clientHeight;
+
+    const checkGeometry = (): void => {
+      geometryFrame = null;
+      if (overlay._stratifyCanvas !== canvas || overlay._stratifyInner !== inner) return;
+
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const changed = width !== lastWidth || height !== lastHeight;
+      lastWidth = width;
+      lastHeight = height;
+      if (width <= 1 || height <= 1) return;
+
+      if (!overlay._stratifyLayoutReady) {
+        if (!overlay._stratifyRenderPending) {
+          this._renderTreeIntoCanvas(
+            overlay,
+            overlay._stratifyPendingPreserveTransform === true
+          );
+        }
+        return;
+      }
+
+      if (changed && !overlay._stratifyUserTransformed) {
+        this._fitTo(canvas, inner);
+      }
+    };
+    const scheduleGeometryCheck = (): void => {
+      if (geometryFrame !== null) ownerWindow.cancelAnimationFrame(geometryFrame);
+      geometryFrame = ownerWindow.requestAnimationFrame(checkGeometry);
+    };
+
+    const observer = new ownerWindow.ResizeObserver(scheduleGeometryCheck);
+    observer.observe(canvas);
+
+    const prevCleanup = overlay._stratifyCleanup;
+    overlay._stratifyCleanup = () => {
+      if (prevCleanup) prevCleanup();
+      observer.disconnect();
+      if (geometryFrame !== null) ownerWindow.cancelAnimationFrame(geometryFrame);
+      geometryFrame = null;
+      if (overlay._stratifyRenderFrame !== null && overlay._stratifyRenderFrame !== undefined) {
+        ownerWindow.cancelAnimationFrame(overlay._stratifyRenderFrame);
+      }
+      overlay._stratifyRenderFrame = null;
+      overlay._stratifyRenderPending = false;
+      overlay._stratifyRenderGeneration = (overlay._stratifyRenderGeneration || 0) + 1;
+    };
+  }
+
   _bindPanZoom(
     canvas: StratifyCanvasElement,
     inner: HTMLDivElement,
@@ -3286,6 +3422,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     };
     const onMove = (e: MouseEvent): void => {
       if (!dragging) return;
+      overlay._stratifyUserTransformed = true;
       canvas._stratify.tx = stx + (e.clientX - sx);
       canvas._stratify.ty = sty + (e.clientY - sy);
       this._applyTransform(inner, canvas._stratify);
@@ -3339,12 +3476,14 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       if (e.touches.length === 1 && touchId !== null) {
         const t = e.touches[0];
         if (t.identifier !== touchId) return;
+        overlay._stratifyUserTransformed = true;
         canvas._stratify.tx = stx + (t.clientX - sx);
         canvas._stratify.ty = sty + (t.clientY - sy);
         this._applyTransform(inner, canvas._stratify);
         e.preventDefault();
       } else if (e.touches.length === 2) {
         const [a, b] = [e.touches[0], e.touches[1]];
+        overlay._stratifyUserTransformed = true;
         const newDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
         const factor = newDist / pinchDist;
         const newScale = Math.max(0.2, Math.min(3, pinchScale * factor));
@@ -3373,6 +3512,7 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
       }
     });
     canvas.addEventListener('wheel', (e) => {
+      overlay._stratifyUserTransformed = true;
       const isZoom = e.ctrlKey || e.metaKey;
       if (!isZoom) {
         canvas._stratify.ty -= e.deltaY;
@@ -3394,17 +3534,28 @@ class StratifyMindmapPlugin extends obsidian.Plugin {
     inner.style.transform = `translate(${s.tx}px, ${s.ty}px) scale(${s.scale})`;
   }
 
-  _fitTo(canvas: StratifyCanvasElement, inner: HTMLDivElement): void {
+  _fitTo(canvas: StratifyCanvasElement, inner: HTMLDivElement): boolean {
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
     const iw = parseFloat(inner.style.width) || inner.clientWidth;
     const ih = parseFloat(inner.style.height) || inner.clientHeight;
-    if (!iw || !ih) return;
+    if (
+      !Number.isFinite(cw) ||
+      !Number.isFinite(ch) ||
+      !Number.isFinite(iw) ||
+      !Number.isFinite(ih) ||
+      cw <= 1 ||
+      ch <= 1 ||
+      iw <= 0 ||
+      ih <= 0
+    ) return false;
     const scale = Math.min(cw / iw, ch / ih, 1);
+    if (!Number.isFinite(scale) || scale <= 0) return false;
     const tx = (cw - iw * scale) / 2;
     const ty = (ch - ih * scale) / 2;
     canvas._stratify = { tx, ty, scale };
     this._applyTransform(inner, canvas._stratify);
+    return true;
   }
 
   _zoomBy(canvas: StratifyCanvasElement, inner: HTMLDivElement, factor: number): void {

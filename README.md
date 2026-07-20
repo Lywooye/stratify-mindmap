@@ -6,6 +6,12 @@ Stratify Mindmap is a Markdown-native mind map plugin for Obsidian. It keeps the
 
 The interface is deliberately compact: structure and layout stay in the main toolbar, common view controls use icons, and appearance/export options live in one menu.
 
+## What's New in 1.2.0
+
+- Restores mind map layout after Obsidian reloads or a background tab becomes visible.
+- Rejects invalid startup canvas dimensions instead of saving a broken near-zero zoom.
+- Refits automatically while the workspace is settling, without overriding later user pan or zoom.
+
 ## Highlights
 
 - Mind maps deeper than six levels
@@ -20,6 +26,7 @@ The interface is deliberately compact: structure and layout stay in the main too
 - Configurable node font size and matching PNG export text
 - Automatic wrapping for long labels and a more compact layout
 - Source-only Markdown preservation indicators
+- Reliable layout recovery after workspace and tab restoration
 - Mobile toolbar below the system safe area and Obsidian view controls, with 44-pixel touch targets
 - Desktop and mobile support
 
@@ -114,7 +121,9 @@ Conversion adds the required frontmatter and detects the source structure withou
 
 ## Installation
 
-Until Stratify Mindmap is listed in Obsidian Community Plugins, install it from a GitHub release:
+Install **Stratify Mindmap** from **Settings -> Community plugins -> Browse** in Obsidian.
+
+For manual installation from a GitHub release:
 
 1. Create `<vault>/.obsidian/plugins/stratify-mindmap/`.
 2. Download the release assets `main.js`, `manifest.json`, and `styles.css` and place them in that directory.
