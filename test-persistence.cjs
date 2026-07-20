@@ -94,6 +94,11 @@ plugin.app = {
       vaultReadCount += 1;
       return diskValue;
     },
+    modify: async (target, content) => {
+      assert.strictEqual(target, file);
+      diskValue = content;
+      writeCount += 1;
+    },
     process: async (target, update) => {
       assert.strictEqual(target, file);
       diskValue = update(diskValue);
@@ -145,10 +150,10 @@ async function run() {
   plugin._addChild(overlay, treeInfo.tree, true, undoSnapshot);
   await pendingPersist;
 
-  assert.strictEqual(writeCount, 0, 'an open mind map should not bypass the Editor API');
-  assert.strictEqual(editorSetCount, 1, 'saving an open mind map should use one Editor API write');
-  assert.strictEqual(requestSaveCount, 1, 'an Editor API write should request an Obsidian save');
-  assert.notStrictEqual(diskValue, editorValue, 'the regression setup must retain stale disk content');
+  assert.strictEqual(writeCount, 1, 'a mind map save must commit the serialized Markdown to the vault');
+  assert.strictEqual(editorSetCount, 1, 'a stale open editor must be synchronized after the vault write');
+  assert.strictEqual(requestSaveCount, 0, 'the verified vault write must not depend on a deferred view save');
+  assert.strictEqual(diskValue, editorValue, 'the vault and open editor must contain the same Markdown');
 
   const renderedContents = [];
   plugin._render = (targetOverlay, content) => renderedContents.push(content);
@@ -183,8 +188,8 @@ async function run() {
   assert.strictEqual(reopenedTree.tree.children.length, 1);
   assert.strictEqual(reopenedTree.tree.children[0].rawText, 'New Title');
 
-  const beforeModeWrite = editorSetCount;
-  const beforeModeSaveRequest = requestSaveCount;
+  const beforeModeDiskWrite = writeCount;
+  const beforeModeEditorWrite = editorSetCount;
   const headingContent = plugin._serializeMindmap(
     overlay._stratifyParsed,
     overlay._stratifyTreeInfo,
@@ -195,8 +200,9 @@ async function run() {
   overlay._stratifyWriting = true;
   await plugin._writeMindmapContent(overlay, headingContent);
   overlay._stratifyWriting = false;
-  assert.strictEqual(editorSetCount, beforeModeWrite + 1, 'mode changes must persist as one complete editor write');
-  assert.strictEqual(requestSaveCount, beforeModeSaveRequest + 1, 'mode changes must request an Obsidian save');
+  assert.strictEqual(writeCount, beforeModeDiskWrite + 1, 'mode changes must write the complete Markdown to the vault');
+  assert.strictEqual(editorSetCount, beforeModeEditorWrite + 1, 'a mode change must synchronize the open editor');
+  assert.strictEqual(requestSaveCount, 0, 'mode changes must not depend on a deferred view save');
   assert.strictEqual(editorValue, headingContent);
 
   const broken = headingContent.replace('mindmap-structure: heading', 'mindmap-structure: list');
@@ -351,6 +357,76 @@ async function run() {
   assert.ok(geometryObserverDisconnected, 'render cleanup must disconnect the canvas observer');
   plugin._renderTreeIntoCanvas = originalRenderTreeIntoCanvas;
   plugin._fitTo = originalFitTo;
+
+  const switchingOldFile = { path: 'Maps/Switching Old.md', basename: 'Switching Old' };
+  const switchingNewFile = { path: 'Maps/Switching New.md', basename: 'Switching New' };
+  const switchingOldContent = plugin._newMindmapContent();
+  const switchingParsed = plugin._parseStructured(switchingOldContent, 'list');
+  const switchingTreeInfo = plugin._buildTree(switchingParsed, switchingOldFile.basename);
+  const switchingNodeEl = {
+    isContentEditable: true,
+    textContent: 'Typed without Enter',
+    removeEventListener: () => {},
+    classList: { remove: () => {} },
+  };
+  switchingTreeInfo.tree._el = switchingNodeEl;
+  const switchingOverlay = {
+    _stratifyFile: switchingOldFile,
+    _stratifyView: view,
+    _stratifyParsed: switchingParsed,
+    _stratifyTreeInfo: switchingTreeInfo,
+    _stratifyStructure: 'list',
+    _stratifyEditingNode: switchingTreeInfo.tree,
+    _stratifyEditSnapshot: switchingOldContent,
+    _stratifyEditChanged: false,
+    _stratifyUndoStack: [],
+    _stratifyRedoStack: [],
+    _stratifyAutosaveTimer: null,
+    _stratifyMention: null,
+    classList: {
+      contains: () => false,
+      toggle: () => {},
+    },
+    dataset: {},
+    ownerDocument: {
+      defaultView: {
+        requestAnimationFrame: (callback) => callback(),
+        clearTimeout: () => {},
+      },
+    },
+  };
+  const switchingView = Object.assign(new MockMarkdownView(), {
+    file: switchingNewFile,
+    editor: { getValue: () => plugin._newMindmapContent() },
+    contentEl: {
+      querySelector: () => switchingOverlay,
+      addClass: () => {},
+      removeClass: () => {},
+    },
+  });
+  switchingOverlay._stratifyView = switchingView;
+  let switchingPersisted = switchingOldContent;
+  const switchingLeaves = plugin.app.workspace.getLeavesOfType;
+  plugin.app.workspace.getLeavesOfType = () => [{ view: switchingView }];
+  plugin.app.metadataCache.getFileCache = () => ({ frontmatter: { type: 'mindmap', 'mindmap-structure': 'list' } });
+  plugin.app.vault.modify = async (target, content) => {
+    assert.strictEqual(target, switchingOldFile, 'switching files must save the overlay\'s old file');
+    switchingPersisted = content;
+  };
+  await plugin._doScan();
+  assert.match(
+    switchingPersisted,
+    /- Typed without Enter/,
+    'switching files must persist the active node without Enter, Tab, or blur'
+  );
+  assert.strictEqual(switchingOverlay._stratifyEditingNode, null, 'a switched file must leave edit mode');
+  plugin.app.workspace.getLeavesOfType = switchingLeaves;
+  plugin.app.metadataCache.getFileCache = () => ({ frontmatter: { type: 'mindmap', 'mindmap-structure': 'list' } });
+  plugin.app.vault.modify = async (target, content) => {
+    assert.strictEqual(target, file);
+    diskValue = content;
+    writeCount += 1;
+  };
 
   assert.deepStrictEqual(plugin._hexToRgb('rgb(255, 255, 255)'), [255, 255, 255]);
   assert.deepStrictEqual(plugin._hexToRgb('rgba(12, 34, 56, 0.5)'), [12, 34, 56]);

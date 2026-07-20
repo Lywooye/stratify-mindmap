@@ -1,6 +1,6 @@
 {
   "name": "stratify-mindmap",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Markdown-native mind maps with deep structures and keyboard editing.",
   "main": "main.js",
   "type": "module",

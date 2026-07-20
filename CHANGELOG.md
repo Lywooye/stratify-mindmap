@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1
+
+- Restored reliable Markdown persistence by writing structured edits through Obsidian's Vault API and synchronizing the active editor buffer.
+- Autosaved unfinished node edits and committed them before switching notes or opening Markdown source mode.
+- Serialized writes against their originating file to prevent stale or cross-file updates during rapid navigation.
+- Kept interactive relayouts synchronous when geometry is ready and prevented edit focus from scrolling the canvas.
+- Added regression coverage for disk persistence, editor synchronization, note switching, and interaction layout stability.
+
 ## 1.2.0
 
 - Deferred initial node measurement until both the canvas and root node have usable dimensions.
